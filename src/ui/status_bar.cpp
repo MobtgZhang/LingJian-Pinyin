@@ -1,0 +1,328 @@
+#include "status_bar.h"
+#include "status_bar_menu.h"
+
+#include <QPainter>
+#include <QPainterPath>
+#include <QMouseEvent>
+#include <QContextMenuEvent>
+#include <QToolTip>
+#include <QtMath>
+
+StatusBar::StatusBar(QWidget *parent)
+    : QFrame(parent) {
+    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    setAttribute(Qt::WA_TranslucentBackground);
+    setMouseTracking(true);
+    rebuildButtons();
+}
+
+void StatusBar::setInputMode(InputMode mode) {
+    if (inputMode_ == mode) return;
+    inputMode_ = mode;
+    rebuildButtons();
+    update();
+}
+
+void StatusBar::setPunctuationMode(PunctuationMode mode) {
+    if (punctuationMode_ == mode) return;
+    punctuationMode_ = mode;
+    rebuildButtons();
+    update();
+}
+
+void StatusBar::setSkin(Skin skin) {
+    skin_ = skin;
+    update();
+}
+
+void StatusBar::rebuildButtons() {
+    buttons_.clear();
+
+    QString modeLabel = (inputMode_ == InputMode::Chinese)
+        ? QStringLiteral("\u4e2d") : QStringLiteral("\u82f1");
+    QString punctLabel = (punctuationMode_ == PunctuationMode::Chinese)
+        ? QStringLiteral("\uff0c") : QStringLiteral(",");
+
+    buttons_.append({QStringLiteral("\u7075"), {}, false});       // Logo
+    buttons_.append({modeLabel, {}, false});                       // 中/英
+    buttons_.append({punctLabel, {}, false});                      // 标点
+    buttons_.append({QStringLiteral("\U0001F3A4"), {}, false});   // 语音 (麦克风 emoji)
+    buttons_.append({QStringLiteral("\u2328"), {}, false});        // 键盘 (⌨)
+    buttons_.append({QStringLiteral("\U0001F3A8"), {}, false});   // 皮肤 (调色板 emoji)
+    buttons_.append({QStringLiteral("Ai"), {}, false});            // AI
+
+    int x = kPadding;
+    for (int i = 0; i < buttons_.size(); ++i) {
+        if (i == 1) x += kSeparatorWidth + kPadding;
+        buttons_[i].rect = QRectF(x, (kBarHeight - kButtonSize) / 2.0,
+                                   kButtonSize, kButtonSize);
+        x += kButtonSize + kPadding;
+    }
+
+    updateGeometry();
+}
+
+QSize StatusBar::sizeHint() const {
+    if (buttons_.isEmpty()) return {200, kBarHeight};
+    double right = buttons_.last().rect.right() + kPadding;
+    return {static_cast<int>(qCeil(right)), kBarHeight};
+}
+
+int StatusBar::hitTest(const QPoint &pos) const {
+    for (int i = 0; i < buttons_.size(); ++i) {
+        if (buttons_[i].rect.contains(pos)) return i;
+    }
+    return -1;
+}
+
+void StatusBar::paintEvent(QPaintEvent *event) {
+    Q_UNUSED(event);
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+
+    const int radius = 6;
+    QRectF bgRect = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+
+    QColor bgColor, borderColor, textColor, hoverBg, logoColor, aiColor;
+
+    switch (skin_) {
+    case Skin::Dark:
+        bgColor = QColor(40, 40, 40, 240);
+        borderColor = QColor(70, 70, 70);
+        textColor = QColor(230, 230, 230);
+        hoverBg = QColor(255, 255, 255, 30);
+        logoColor = QColor(255, 140, 26);
+        aiColor = QColor(100, 200, 255);
+        break;
+    case Skin::Blue:
+        bgColor = QColor(25, 55, 110, 240);
+        borderColor = QColor(50, 100, 200);
+        textColor = QColor(220, 235, 255);
+        hoverBg = QColor(255, 255, 255, 25);
+        logoColor = QColor(255, 180, 50);
+        aiColor = QColor(150, 230, 255);
+        break;
+    case Skin::Light:
+    default:
+        bgColor = QColor(255, 255, 255, 245);
+        borderColor = QColor(210, 210, 210);
+        textColor = QColor(50, 50, 50);
+        hoverBg = QColor(0, 0, 0, 18);
+        logoColor = QColor(255, 120, 0);
+        aiColor = QColor(40, 130, 220);
+        break;
+    }
+
+    // --- 背景 ---
+    QPainterPath bgPath;
+    bgPath.addRoundedRect(bgRect, radius, radius);
+    painter.fillPath(bgPath, bgColor);
+    painter.setPen(QPen(borderColor, 1));
+    painter.drawPath(bgPath);
+
+    QFont baseFont;
+    baseFont.setPointSize(13);
+    baseFont.setWeight(QFont::Medium);
+
+    for (int i = 0; i < buttons_.size(); ++i) {
+        const auto &btn = buttons_[i];
+
+        // hover 高亮（跳过 logo）
+        if (btn.hovered && i > 0) {
+            QPainterPath hoverPath;
+            hoverPath.addRoundedRect(btn.rect.adjusted(1, 1, -1, -1), 4, 4);
+            painter.fillPath(hoverPath, hoverBg);
+        }
+
+        // 分隔线: logo 后面
+        if (i == 1) {
+            double sepX = btn.rect.left() - kPadding / 2.0 - kSeparatorWidth / 2.0;
+            painter.setPen(QPen(borderColor, kSeparatorWidth));
+            painter.drawLine(QPointF(sepX, btn.rect.top() + 4),
+                             QPointF(sepX, btn.rect.bottom() - 4));
+        }
+
+        QFont drawFont = baseFont;
+        QColor drawColor = textColor;
+
+        switch (i) {
+        case 0: { // Logo "灵"
+            drawFont.setPointSize(14);
+            drawFont.setWeight(QFont::Bold);
+            drawColor = logoColor;
+            break;
+        }
+        case 1: { // 中/英
+            drawFont.setPointSize(14);
+            drawFont.setWeight(QFont::Bold);
+            break;
+        }
+        case 2: { // 标点
+            drawFont.setPointSize(15);
+            break;
+        }
+        case 3: { // 语音
+            drawFont.setPointSize(13);
+            break;
+        }
+        case 4: { // 键盘
+            drawFont.setPointSize(14);
+            break;
+        }
+        case 5: { // 皮肤
+            drawFont.setPointSize(13);
+            break;
+        }
+        case 6: { // Ai
+            drawFont.setPointSize(12);
+            drawFont.setWeight(QFont::Bold);
+            drawColor = aiColor;
+            break;
+        }
+        default:
+            break;
+        }
+
+        painter.setFont(drawFont);
+        painter.setPen(drawColor);
+        painter.drawText(btn.rect, Qt::AlignCenter, btn.label);
+    }
+}
+
+void StatusBar::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        mousePressed_ = true;
+        dragging_ = false;
+        pressGlobalPos_ = event->globalPosition().toPoint();
+        dragPosition_ = pressGlobalPos_ - frameGeometry().topLeft();
+        event->accept();
+        return;
+    }
+    QFrame::mousePressEvent(event);
+}
+
+void StatusBar::mouseMoveEvent(QMouseEvent *event) {
+    if (mousePressed_ && (event->buttons() & Qt::LeftButton)) {
+        const int dragThreshold = 4;
+        QPoint delta = event->globalPosition().toPoint() - pressGlobalPos_;
+        if (!dragging_ && delta.manhattanLength() >= dragThreshold) {
+            dragging_ = true;
+            setCursor(Qt::SizeAllCursor);
+        }
+        if (dragging_) {
+            move(event->globalPosition().toPoint() - dragPosition_);
+            event->accept();
+            return;
+        }
+    }
+
+    int idx = hitTest(event->pos());
+    bool needUpdate = false;
+    for (int i = 0; i < buttons_.size(); ++i) {
+        bool shouldHover = (i == idx);
+        if (buttons_[i].hovered != shouldHover) {
+            buttons_[i].hovered = shouldHover;
+            needUpdate = true;
+        }
+    }
+    if (needUpdate) {
+        if (idx >= 0) {
+            static const QStringList tooltips = {
+                QStringLiteral("\u7075\u952e\u62fc\u97f3"),
+                QStringLiteral("\u4e2d/\u82f1\u6587\u5207\u6362"),
+                QStringLiteral("\u4e2d/\u82f1\u6587\u6807\u70b9"),
+                QStringLiteral("\u8bed\u97f3\u8f93\u5165"),
+                QStringLiteral("\u952e\u76d8\u5e03\u5c40"),
+                QStringLiteral("\u76ae\u80a4\u8bbe\u7f6e"),
+                QStringLiteral("AI \u529f\u80fd"),
+            };
+            if (idx < tooltips.size()) {
+                QToolTip::showText(event->globalPosition().toPoint(),
+                                   tooltips[idx], this);
+            }
+        } else {
+            QToolTip::hideText();
+        }
+        update();
+    }
+    QFrame::mouseMoveEvent(event);
+}
+
+void StatusBar::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton && mousePressed_) {
+        mousePressed_ = false;
+
+        if (dragging_) {
+            dragging_ = false;
+            unsetCursor();
+            event->accept();
+            return;
+        }
+
+        int idx = hitTest(event->pos());
+        switch (idx) {
+        case 1: {
+            InputMode newMode = (inputMode_ == InputMode::Chinese)
+                ? InputMode::English : InputMode::Chinese;
+            setInputMode(newMode);
+            emit inputModeToggled(newMode);
+            break;
+        }
+        case 2: {
+            PunctuationMode newMode = (punctuationMode_ == PunctuationMode::Chinese)
+                ? PunctuationMode::English : PunctuationMode::Chinese;
+            setPunctuationMode(newMode);
+            emit punctuationModeToggled(newMode);
+            break;
+        }
+        case 3:
+            emit voiceInputClicked();
+            break;
+        case 4:
+            emit keyboardClicked();
+            break;
+        case 5:
+            emit skinClicked();
+            break;
+        case 6:
+            emit aiClicked();
+            break;
+        default:
+            break;
+        }
+        event->accept();
+        return;
+    }
+    QFrame::mouseReleaseEvent(event);
+}
+
+void StatusBar::ensureContextMenu() {
+    if (contextMenu_) return;
+
+    contextMenu_ = new StatusBarMenu(this);
+
+    connect(contextMenu_, &StatusBarMenu::chineseEnglishToggled, this, [this]() {
+        InputMode newMode = (inputMode_ == InputMode::Chinese)
+            ? InputMode::English : InputMode::Chinese;
+        setInputMode(newMode);
+        emit inputModeToggled(newMode);
+    });
+
+    connect(contextMenu_, &StatusBarMenu::hideStatusBarClicked,
+            this, &StatusBar::hide);
+    connect(contextMenu_, &StatusBarMenu::voiceInputClicked,
+            this, &StatusBar::voiceInputClicked);
+    connect(contextMenu_, &StatusBarMenu::softKeyboardClicked,
+            this, &StatusBar::keyboardClicked);
+    connect(contextMenu_, &StatusBarMenu::skinStoreClicked,
+            this, &StatusBar::skinClicked);
+    connect(contextMenu_, &StatusBarMenu::aiToolsClicked,
+            this, &StatusBar::aiClicked);
+}
+
+void StatusBar::contextMenuEvent(QContextMenuEvent *event) {
+    ensureContextMenu();
+    contextMenu_->popup(event->globalPos());
+}
