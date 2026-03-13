@@ -111,6 +111,20 @@ bool SkinLoader::parseIniFile(const QString &iniPath, const QString &baseDir) {
     }
     ini.endGroup();
 
+    ini.beginGroup(QStringLiteral("SoftKeyboard"));
+    config_.skBackground = parseColor(ini.value(QStringLiteral("background_color"), "#E6E8EA").toString());
+    config_.skBorder = parseColor(ini.value(QStringLiteral("border_color"), "#C8C8C8").toString());
+    config_.skKeyBg = parseColor(ini.value(QStringLiteral("key_background"), "#FFFFFF").toString());
+    config_.skKeyBorder = parseColor(ini.value(QStringLiteral("key_border"), "#B9B9B9").toString());
+    config_.skKeyText = parseColor(ini.value(QStringLiteral("key_text"), "#1E1E1E").toString());
+    config_.skKeyHover = parseColor(ini.value(QStringLiteral("key_hover"), "#DCE6F5").toString());
+    config_.skKeyPressed = parseColor(ini.value(QStringLiteral("key_pressed"), "#C8D2E6").toString());
+    config_.skFuncKeyBg = parseColor(ini.value(QStringLiteral("func_key_background"), "#C8CACD").toString());
+    config_.skTitleBg = parseColor(ini.value(QStringLiteral("title_background"), "#4285F4").toString());
+    config_.skTitleText = parseColor(ini.value(QStringLiteral("title_text"), "#FFFFFF").toString());
+    config_.skBorderRadius = ini.value(QStringLiteral("border_radius"), 4).toInt();
+    ini.endGroup();
+
     return true;
 }
 
@@ -163,6 +177,16 @@ SkinConfig SkinLoader::darkSkin() {
     c.sbHover = QColor(255, 255, 255, 30);
     c.sbLogo = QColor(255, 140, 26);
     c.sbAi = QColor(100, 200, 255);
+    c.skBackground = QColor(35, 35, 35);
+    c.skBorder = QColor(60, 60, 60);
+    c.skKeyBg = QColor(55, 55, 55);
+    c.skKeyBorder = QColor(70, 70, 70);
+    c.skKeyText = QColor(230, 230, 230);
+    c.skKeyHover = QColor(70, 80, 95);
+    c.skKeyPressed = QColor(50, 60, 75);
+    c.skFuncKeyBg = QColor(45, 45, 48);
+    c.skTitleBg = QColor(50, 50, 55);
+    c.skTitleText = QColor(200, 200, 200);
     return c;
 }
 
@@ -182,6 +206,16 @@ SkinConfig SkinLoader::lightSkin() {
     c.sbHover = QColor(0, 0, 0, 18);
     c.sbLogo = QColor(255, 120, 0);
     c.sbAi = QColor(40, 130, 220);
+    c.skBackground = QColor(230, 232, 234);
+    c.skBorder = QColor(200, 200, 200);
+    c.skKeyBg = QColor(255, 255, 255);
+    c.skKeyBorder = QColor(185, 185, 185);
+    c.skKeyText = QColor(30, 30, 30);
+    c.skKeyHover = QColor(220, 230, 245);
+    c.skKeyPressed = QColor(200, 210, 230);
+    c.skFuncKeyBg = QColor(200, 202, 205);
+    c.skTitleBg = QColor(66, 133, 244);
+    c.skTitleText = QColor(255, 255, 255);
     return c;
 }
 
@@ -201,6 +235,16 @@ SkinConfig SkinLoader::blueSkin() {
     c.sbHover = QColor(255, 255, 255, 25);
     c.sbLogo = QColor(255, 180, 50);
     c.sbAi = QColor(150, 230, 255);
+    c.skBackground = QColor(20, 45, 90);
+    c.skBorder = QColor(40, 80, 160);
+    c.skKeyBg = QColor(35, 65, 130);
+    c.skKeyBorder = QColor(50, 90, 170);
+    c.skKeyText = QColor(210, 230, 255);
+    c.skKeyHover = QColor(50, 85, 160);
+    c.skKeyPressed = QColor(30, 60, 120);
+    c.skFuncKeyBg = QColor(28, 55, 110);
+    c.skTitleBg = QColor(40, 80, 170);
+    c.skTitleText = QColor(220, 235, 255);
     return c;
 }
 
@@ -220,6 +264,16 @@ SkinConfig SkinLoader::greenSkin() {
     c.sbHover = QColor(255, 255, 255, 25);
     c.sbLogo = QColor(255, 220, 80);
     c.sbAi = QColor(150, 240, 180);
+    c.skBackground = QColor(28, 70, 42);
+    c.skBorder = QColor(40, 100, 58);
+    c.skKeyBg = QColor(38, 90, 55);
+    c.skKeyBorder = QColor(50, 110, 68);
+    c.skKeyText = QColor(220, 250, 228);
+    c.skKeyHover = QColor(50, 110, 70);
+    c.skKeyPressed = QColor(32, 75, 48);
+    c.skFuncKeyBg = QColor(30, 75, 46);
+    c.skTitleBg = QColor(40, 110, 62);
+    c.skTitleText = QColor(220, 255, 230);
     return c;
 }
 
@@ -239,6 +293,16 @@ SkinConfig SkinLoader::purpleSkin() {
     c.sbHover = QColor(255, 255, 255, 25);
     c.sbLogo = QColor(255, 170, 100);
     c.sbAi = QColor(200, 160, 255);
+    c.skBackground = QColor(40, 25, 68);
+    c.skBorder = QColor(75, 50, 120);
+    c.skKeyBg = QColor(55, 38, 90);
+    c.skKeyBorder = QColor(80, 55, 130);
+    c.skKeyText = QColor(225, 210, 250);
+    c.skKeyHover = QColor(70, 50, 110);
+    c.skKeyPressed = QColor(45, 30, 75);
+    c.skFuncKeyBg = QColor(45, 30, 75);
+    c.skTitleBg = QColor(70, 45, 120);
+    c.skTitleText = QColor(230, 215, 255);
     return c;
 }
 
@@ -258,6 +322,16 @@ SkinConfig SkinLoader::roseSkin() {
     c.sbHover = QColor(255, 255, 255, 25);
     c.sbLogo = QColor(255, 200, 50);
     c.sbAi = QColor(255, 150, 190);
+    c.skBackground = QColor(85, 16, 42);
+    c.skBorder = QColor(140, 35, 68);
+    c.skKeyBg = QColor(110, 25, 55);
+    c.skKeyBorder = QColor(150, 40, 75);
+    c.skKeyText = QColor(255, 220, 232);
+    c.skKeyHover = QColor(130, 35, 70);
+    c.skKeyPressed = QColor(90, 20, 48);
+    c.skFuncKeyBg = QColor(90, 20, 46);
+    c.skTitleBg = QColor(140, 35, 70);
+    c.skTitleText = QColor(255, 225, 235);
     return c;
 }
 
@@ -277,6 +351,16 @@ SkinConfig SkinLoader::sunsetSkin() {
     c.sbHover = QColor(255, 255, 255, 25);
     c.sbLogo = QColor(255, 100, 60);
     c.sbAi = QColor(255, 190, 80);
+    c.skBackground = QColor(68, 28, 8);
+    c.skBorder = QColor(130, 58, 16);
+    c.skKeyBg = QColor(90, 40, 12);
+    c.skKeyBorder = QColor(145, 62, 18);
+    c.skKeyText = QColor(255, 235, 215);
+    c.skKeyHover = QColor(110, 50, 18);
+    c.skKeyPressed = QColor(72, 32, 10);
+    c.skFuncKeyBg = QColor(72, 32, 10);
+    c.skTitleBg = QColor(140, 60, 18);
+    c.skTitleText = QColor(255, 240, 220);
     return c;
 }
 
@@ -296,5 +380,15 @@ SkinConfig SkinLoader::iceSkin() {
     c.sbHover = QColor(0, 0, 0, 15);
     c.sbLogo = QColor(0, 180, 220);
     c.sbAi = QColor(40, 140, 200);
+    c.skBackground = QColor(210, 232, 245);
+    c.skBorder = QColor(170, 200, 220);
+    c.skKeyBg = QColor(235, 248, 255);
+    c.skKeyBorder = QColor(175, 205, 225);
+    c.skKeyText = QColor(25, 55, 75);
+    c.skKeyHover = QColor(195, 225, 245);
+    c.skKeyPressed = QColor(180, 212, 235);
+    c.skFuncKeyBg = QColor(195, 220, 238);
+    c.skTitleBg = QColor(50, 150, 210);
+    c.skTitleText = QColor(240, 250, 255);
     return c;
 }

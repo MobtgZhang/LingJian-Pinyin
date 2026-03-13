@@ -279,7 +279,7 @@ void StatusBar::ensureContextMenu() {
     });
 
     connect(contextMenu_, &StatusBarMenu::hideStatusBarClicked,
-            this, &StatusBar::hide);
+            this, [this]() { emit hideRequested(); });
     connect(contextMenu_, &StatusBarMenu::voiceInputClicked,
             this, &StatusBar::voiceInputClicked);
     connect(contextMenu_, &StatusBarMenu::softKeyboardClicked,

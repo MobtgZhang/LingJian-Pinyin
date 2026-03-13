@@ -37,6 +37,19 @@ struct SkinConfig {
     QColor sbAi{40, 130, 220};
     QPixmap sbBackgroundImage;
     int sbBorderRadius = 6;
+
+    // SoftKeyboard
+    QColor skBackground{230, 232, 234};
+    QColor skBorder{200, 200, 200};
+    QColor skKeyBg{255, 255, 255};
+    QColor skKeyBorder{185, 185, 185};
+    QColor skKeyText{30, 30, 30};
+    QColor skKeyHover{220, 230, 245};
+    QColor skKeyPressed{200, 210, 230};
+    QColor skFuncKeyBg{200, 202, 205};
+    QColor skTitleBg{66, 133, 244};
+    QColor skTitleText{255, 255, 255};
+    int skBorderRadius = 4;
 };
 
 class SkinLoader {

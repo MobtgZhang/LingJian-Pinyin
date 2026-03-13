@@ -159,8 +159,8 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
 
         if (hoveredToggle_ == i) {
             QPainterPath hp;
-            hp.addRoundedRect(t.rect.adjusted(6, 3, -6, -3), 8, 8);
-            p.fillPath(hp, QColor(0, 0, 0, 15));
+            hp.addRoundedRect(t.rect.adjusted(2, 1, -2, -1), 8, 8);
+            p.fillPath(hp, QColor(0, 0, 0, 35));
         }
 
         QRectF charRect(t.rect.left(), t.rect.top(),
@@ -197,8 +197,8 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
 
         if (hoveredItem_ == i) {
             QPainterPath hp;
-            hp.addRoundedRect(r.adjusted(5, 2, -5, -2), 6, 6);
-            p.fillPath(hp, QColor(0, 0, 0, 10));
+            hp.addRoundedRect(r.adjusted(2, 1, -2, -1), 6, 6);
+            p.fillPath(hp, QColor(0, 0, 0, 35));
         }
 
         QFont drawIconFont = iconFont;

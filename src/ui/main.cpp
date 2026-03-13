@@ -7,6 +7,9 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDir>
+#include <QKeyEvent>
+#include <QSystemTrayIcon>
+#include <QPainter>
 
 #include "candidate_view.h"
 #include "input_widget.h"
@@ -14,8 +17,26 @@
 #include "theme_manager.h"
 #include "skin_loader.h"
 #include "skin_selector.h"
+#include "soft_keyboard.h"
 
 #include <context.h>
+
+static QIcon createLingTrayIcon() {
+    const int size = 22;
+    QPixmap pix(size, size);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::TextAntialiasing, true);
+    QFont font;
+    font.setPointSize(13);
+    font.setWeight(QFont::Bold);
+    p.setFont(font);
+    p.setPen(QColor(30, 30, 30));
+    p.drawText(QRect(0, 0, size, size), Qt::AlignCenter, QStringLiteral("\u7075"));
+    p.end();
+    return QIcon(pix);
+}
 
 static QString findDictPath() {
     QStringList searchPaths = {
@@ -34,7 +55,8 @@ static QString findDictPath() {
     return {};
 }
 
-static void applySkinToUI(StatusBar *statusBar, CandidateView *candidateView) {
+static void applySkinToUI(StatusBar *statusBar, CandidateView *candidateView,
+                          SoftKeyboard *softKeyboard) {
     const auto &skin = ThemeManager::instance().skin();
     statusBar->applySkinColors(
         skin.sbBackground, skin.sbBorder, skin.sbText,
@@ -43,6 +65,10 @@ static void applySkinToUI(StatusBar *statusBar, CandidateView *candidateView) {
         skin.cvBackground, skin.cvBorder, skin.cvText,
         skin.cvHighlight, skin.cvPreedit, skin.cvIndex,
         skin.cvBorderRadius, skin.candidateFontSize);
+    softKeyboard->applySkinColors(
+        skin.skBackground, skin.skBorder, skin.skKeyBg, skin.skKeyBorder,
+        skin.skKeyText, skin.skKeyHover, skin.skKeyPressed,
+        skin.skFuncKeyBg, skin.skTitleBg, skin.skTitleText, skin.skBorderRadius);
 }
 
 int main(int argc, char *argv[]) {
@@ -96,6 +122,26 @@ int main(int argc, char *argv[]) {
 
     inputWidget->setStatusBar(&statusBar);
 
+    QSystemTrayIcon *trayIcon = nullptr;
+    QObject::connect(&statusBar, &StatusBar::hideRequested, &mainWin, [&]() {
+        statusBar.hide();
+        if (!trayIcon) {
+            trayIcon = new QSystemTrayIcon(&mainWin);
+            trayIcon->setIcon(createLingTrayIcon());
+            trayIcon->setToolTip(QStringLiteral("灵键拼音"));
+            QObject::connect(trayIcon, &QSystemTrayIcon::activated, trayIcon,
+                [&](QSystemTrayIcon::ActivationReason reason) {
+                    if (reason == QSystemTrayIcon::Trigger) {
+                        statusBar.show();
+                        statusBar.raise();
+                        statusBar.activateWindow();
+                        trayIcon->hide();
+                    }
+                });
+        }
+        trayIcon->show();
+    });
+
     QObject::connect(&statusBar, &StatusBar::inputModeToggled,
                      inputWidget, [inputWidget](StatusBar::InputMode mode) {
         inputWidget->setChineseMode(mode == StatusBar::InputMode::Chinese);
@@ -135,6 +181,56 @@ int main(int argc, char *argv[]) {
         candidateView.setPageInfo(ctx->currentPage() + 1, ctx->totalPages());
     });
 
+    auto *softKeyboard = new SoftKeyboard;
+
+    QObject::connect(&statusBar, &StatusBar::keyboardClicked, &mainWin, [&]() {
+        if (softKeyboard->isVisible()) {
+            softKeyboard->hide();
+        } else {
+            QPoint popupPos = statusBar.mapToGlobal(
+                QPoint(statusBar.width() / 2, 0));
+            softKeyboard->popup(popupPos);
+        }
+    });
+
+    QObject::connect(softKeyboard, &SoftKeyboard::keyPressed,
+                     inputWidget, [inputWidget](const QString &text) {
+        inputWidget->insertPlainText(text);
+    });
+
+    QObject::connect(softKeyboard, &SoftKeyboard::specialKeyPressed,
+                     inputWidget, [inputWidget](Qt::Key key) {
+        switch (key) {
+        case Qt::Key_Backspace: {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier);
+            QApplication::sendEvent(inputWidget, &ev);
+            break;
+        }
+        case Qt::Key_Return: {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+            QApplication::sendEvent(inputWidget, &ev);
+            break;
+        }
+        case Qt::Key_Tab: {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
+            QApplication::sendEvent(inputWidget, &ev);
+            break;
+        }
+        case Qt::Key_Delete: {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+            QApplication::sendEvent(inputWidget, &ev);
+            break;
+        }
+        case Qt::Key_Insert: {
+            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Insert, Qt::NoModifier);
+            QApplication::sendEvent(inputWidget, &ev);
+            break;
+        }
+        default:
+            break;
+        }
+    });
+
     auto *skinSelector = new SkinSelector;
 
     QObject::connect(&statusBar, &StatusBar::skinClicked, &mainWin, [&]() {
@@ -164,7 +260,7 @@ int main(int argc, char *argv[]) {
             path.endsWith(QStringLiteral(".ssf")) ||
             path.endsWith(QStringLiteral(".ljs"))) {
             if (ThemeManager::instance().loadSkinFromZip(path)) {
-                applySkinToUI(&statusBar, &candidateView);
+                applySkinToUI(&statusBar, &candidateView, softKeyboard);
                 QMessageBox::information(&mainWin,
                     QStringLiteral("皮肤加载成功"),
                     QStringLiteral("已成功加载皮肤：") +
@@ -179,10 +275,10 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(&ThemeManager::instance(), &ThemeManager::skinChanged,
                      &mainWin, [&]() {
-        applySkinToUI(&statusBar, &candidateView);
+        applySkinToUI(&statusBar, &candidateView, softKeyboard);
     });
 
-    applySkinToUI(&statusBar, &candidateView);
+    applySkinToUI(&statusBar, &candidateView, softKeyboard);
 
     mainWin.show();
     inputWidget->setFocus();

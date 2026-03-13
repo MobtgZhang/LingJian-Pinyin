@@ -38,6 +38,7 @@ signals:
     void keyboardClicked();
     void skinClicked();
     void aiClicked();
+    void hideRequested();
 
 protected:
     void paintEvent(QPaintEvent *event) override;

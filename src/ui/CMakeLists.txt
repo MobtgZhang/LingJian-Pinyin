@@ -16,6 +16,8 @@ add_executable(lingjian_ui
     skin_loader.h
     skin_selector.cpp
     skin_selector.h
+    soft_keyboard.cpp
+    soft_keyboard.h
     input_widget.cpp
     input_widget.h
 )
