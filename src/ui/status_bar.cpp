@@ -30,8 +30,17 @@ void StatusBar::setPunctuationMode(PunctuationMode mode) {
     update();
 }
 
-void StatusBar::setSkin(Skin skin) {
-    skin_ = skin;
+void StatusBar::applySkinColors(const QColor &bg, const QColor &border,
+                                 const QColor &text, const QColor &hover,
+                                 const QColor &logo, const QColor &ai,
+                                 int borderRadius) {
+    bgColor_ = bg;
+    borderColor_ = border;
+    textColor_ = text;
+    hoverColor_ = hover;
+    logoColor_ = logo;
+    aiColor_ = ai;
+    borderRadius_ = borderRadius;
     update();
 }
 
@@ -43,13 +52,13 @@ void StatusBar::rebuildButtons() {
     QString punctLabel = (punctuationMode_ == PunctuationMode::Chinese)
         ? QStringLiteral("\uff0c") : QStringLiteral(",");
 
-    buttons_.append({QStringLiteral("\u7075"), {}, false});       // Logo
-    buttons_.append({modeLabel, {}, false});                       // 中/英
-    buttons_.append({punctLabel, {}, false});                      // 标点
-    buttons_.append({QStringLiteral("\U0001F3A4"), {}, false});   // 语音 (麦克风 emoji)
-    buttons_.append({QStringLiteral("\u2328"), {}, false});        // 键盘 (⌨)
-    buttons_.append({QStringLiteral("\U0001F3A8"), {}, false});   // 皮肤 (调色板 emoji)
-    buttons_.append({QStringLiteral("Ai"), {}, false});            // AI
+    buttons_.append({QStringLiteral("\u7075"), {}, false});
+    buttons_.append({modeLabel, {}, false});
+    buttons_.append({punctLabel, {}, false});
+    buttons_.append({QStringLiteral("\U0001F3A4"), {}, false});
+    buttons_.append({QStringLiteral("\u2328"), {}, false});
+    buttons_.append({QStringLiteral("\U0001F3A8"), {}, false});
+    buttons_.append({QStringLiteral("Ai"), {}, false});
 
     int x = kPadding;
     for (int i = 0; i < buttons_.size(); ++i) {
@@ -82,44 +91,12 @@ void StatusBar::paintEvent(QPaintEvent *event) {
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
 
-    const int radius = 6;
     QRectF bgRect = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
 
-    QColor bgColor, borderColor, textColor, hoverBg, logoColor, aiColor;
-
-    switch (skin_) {
-    case Skin::Dark:
-        bgColor = QColor(40, 40, 40, 240);
-        borderColor = QColor(70, 70, 70);
-        textColor = QColor(230, 230, 230);
-        hoverBg = QColor(255, 255, 255, 30);
-        logoColor = QColor(255, 140, 26);
-        aiColor = QColor(100, 200, 255);
-        break;
-    case Skin::Blue:
-        bgColor = QColor(25, 55, 110, 240);
-        borderColor = QColor(50, 100, 200);
-        textColor = QColor(220, 235, 255);
-        hoverBg = QColor(255, 255, 255, 25);
-        logoColor = QColor(255, 180, 50);
-        aiColor = QColor(150, 230, 255);
-        break;
-    case Skin::Light:
-    default:
-        bgColor = QColor(255, 255, 255, 245);
-        borderColor = QColor(210, 210, 210);
-        textColor = QColor(50, 50, 50);
-        hoverBg = QColor(0, 0, 0, 18);
-        logoColor = QColor(255, 120, 0);
-        aiColor = QColor(40, 130, 220);
-        break;
-    }
-
-    // --- 背景 ---
     QPainterPath bgPath;
-    bgPath.addRoundedRect(bgRect, radius, radius);
-    painter.fillPath(bgPath, bgColor);
-    painter.setPen(QPen(borderColor, 1));
+    bgPath.addRoundedRect(bgRect, borderRadius_, borderRadius_);
+    painter.fillPath(bgPath, bgColor_);
+    painter.setPen(QPen(borderColor_, 1));
     painter.drawPath(bgPath);
 
     QFont baseFont;
@@ -129,58 +106,49 @@ void StatusBar::paintEvent(QPaintEvent *event) {
     for (int i = 0; i < buttons_.size(); ++i) {
         const auto &btn = buttons_[i];
 
-        // hover 高亮（跳过 logo）
         if (btn.hovered && i > 0) {
             QPainterPath hoverPath;
             hoverPath.addRoundedRect(btn.rect.adjusted(1, 1, -1, -1), 4, 4);
-            painter.fillPath(hoverPath, hoverBg);
+            painter.fillPath(hoverPath, hoverColor_);
         }
 
-        // 分隔线: logo 后面
         if (i == 1) {
             double sepX = btn.rect.left() - kPadding / 2.0 - kSeparatorWidth / 2.0;
-            painter.setPen(QPen(borderColor, kSeparatorWidth));
+            painter.setPen(QPen(borderColor_, kSeparatorWidth));
             painter.drawLine(QPointF(sepX, btn.rect.top() + 4),
                              QPointF(sepX, btn.rect.bottom() - 4));
         }
 
         QFont drawFont = baseFont;
-        QColor drawColor = textColor;
+        QColor drawColor = textColor_;
 
         switch (i) {
-        case 0: { // Logo "灵"
+        case 0:
             drawFont.setPointSize(14);
             drawFont.setWeight(QFont::Bold);
-            drawColor = logoColor;
+            drawColor = logoColor_;
             break;
-        }
-        case 1: { // 中/英
+        case 1:
             drawFont.setPointSize(14);
             drawFont.setWeight(QFont::Bold);
             break;
-        }
-        case 2: { // 标点
+        case 2:
             drawFont.setPointSize(15);
             break;
-        }
-        case 3: { // 语音
+        case 3:
             drawFont.setPointSize(13);
             break;
-        }
-        case 4: { // 键盘
+        case 4:
             drawFont.setPointSize(14);
             break;
-        }
-        case 5: { // 皮肤
+        case 5:
             drawFont.setPointSize(13);
             break;
-        }
-        case 6: { // Ai
+        case 6:
             drawFont.setPointSize(12);
             drawFont.setWeight(QFont::Bold);
-            drawColor = aiColor;
+            drawColor = aiColor_;
             break;
-        }
         default:
             break;
         }
@@ -232,7 +200,7 @@ void StatusBar::mouseMoveEvent(QMouseEvent *event) {
             static const QStringList tooltips = {
                 QStringLiteral("\u7075\u952e\u62fc\u97f3"),
                 QStringLiteral("\u4e2d/\u82f1\u6587\u5207\u6362"),
-                QStringLiteral("\u4e2d/\u82f1\u6587\u6807\u70b9"),
+                QStringLiteral("\u5168\u89d2/\u534a\u89d2\u7b26\u53f7"),
                 QStringLiteral("\u8bed\u97f3\u8f93\u5165"),
                 QStringLiteral("\u952e\u76d8\u5e03\u5c40"),
                 QStringLiteral("\u76ae\u80a4\u8bbe\u7f6e"),

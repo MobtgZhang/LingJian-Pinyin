@@ -1,107 +1,208 @@
 #include "candidate_view.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QMouseEvent>
-#include <QMenu>
-#include <QContextMenuEvent>
 
 CandidateView::CandidateView(QWidget *parent)
     : QFrame(parent) {
     setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     setAttribute(Qt::WA_TranslucentBackground);
+    setMouseTracking(true);
 }
 
 void CandidateView::setCandidates(const QStringList &candidates) {
     candidates_ = candidates;
+    rebuildLayout();
     updateGeometry();
+    adjustSize();
     update();
 }
 
-void CandidateView::setSkin(Skin skin) {
-    skin_ = skin;
+void CandidateView::setPreeditText(const QString &text) {
+    preeditText_ = text;
+    rebuildLayout();
     updateGeometry();
+    adjustSize();
     update();
 }
 
-void CandidateView::paintEvent(QPaintEvent *event) {
-    Q_UNUSED(event);
+void CandidateView::setPageInfo(int current, int total) {
+    currentPage_ = current;
+    totalPages_ = total;
+    update();
+}
 
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing, true);
+void CandidateView::applySkinColors(const QColor &bg, const QColor &border,
+                                     const QColor &text, const QColor &highlight,
+                                     const QColor &preedit, const QColor &index,
+                                     int borderRadius, int fontSize) {
+    bgColor_ = bg;
+    borderColor_ = border;
+    textColor_ = text;
+    highlightColor_ = highlight;
+    preeditColor_ = preedit;
+    indexColor_ = index;
+    borderRadius_ = borderRadius;
+    fontSize_ = fontSize;
+    rebuildLayout();
+    updateGeometry();
+    adjustSize();
+    update();
+}
 
-    const int radius = 8;
-    QRect rect = this->rect().adjusted(1, 1, -1, -1);
+void CandidateView::rebuildLayout() {
+    candRects_.clear();
 
-    QColor backgroundColor;
-    QColor borderColor;
-    QColor textColor;
     QFont font;
+    font.setPointSize(fontSize_);
+    QFontMetrics fm(font);
 
-    switch (skin_) {
-    case Skin::Light:
-        backgroundColor = QColor(250, 250, 250, 235);
-        borderColor = QColor(200, 200, 200);
-        textColor = QColor(40, 40, 40);
-        font.setPointSize(12);
-        break;
-    case Skin::Blue:
-        backgroundColor = QColor(30, 60, 120, 230);
-        borderColor = QColor(40, 120, 220);
-        textColor = QColor(235, 245, 255);
-        font.setPointSize(13);
-        break;
-    case Skin::Dark:
-    default:
-        backgroundColor = QColor(30, 30, 30, 220);
-        borderColor = QColor(80, 80, 80);
-        textColor = QColor(240, 240, 240);
-        font.setPointSize(12);
-        break;
+    int totalHeight = kPreeditHeight + kHeight;
+    int x = kPadding;
+
+    for (int i = 0; i < candidates_.size(); ++i) {
+        QString label = QString::number(i + 1) + QStringLiteral(". ") + candidates_[i];
+        int w = fm.horizontalAdvance(label) + 16;
+        CandRect cr;
+        cr.index = i;
+        cr.rect = QRectF(x, kPreeditHeight, w, kHeight);
+        candRects_.append(cr);
+        x += w + 4;
     }
 
-    painter.setBrush(backgroundColor);
-    painter.setPen(QPen(borderColor, 1));
-    painter.drawRoundedRect(rect, radius, radius);
-
-    painter.setPen(textColor);
-    painter.setFont(font);
-
-    int x = 16;
-    int y = height() / 2 + painter.fontMetrics().ascent() / 2 - 2;
-    int index = 1;
-    for (const auto &cand : candidates_) {
-        const QString text = QString::number(index) + ". " + cand;
-        painter.drawText(x, y, text);
-        x += painter.fontMetrics().horizontalAdvance(text) + 24;
-        ++index;
-    }
+    int arrowW = 24;
+    int arrowY = kPreeditHeight;
+    pageUpRect_ = QRectF(x + 4, arrowY, arrowW, kHeight);
+    pageDownRect_ = QRectF(x + 4 + arrowW + 2, arrowY, arrowW, kHeight);
 }
 
 QSize CandidateView::sizeHint() const {
-    if (candidates_.isEmpty()) {
-        return {200, 40};
+    if (candidates_.isEmpty() && preeditText_.isEmpty()) {
+        return {200, kPreeditHeight + kHeight};
     }
+
+    double right = kPadding;
+    for (const auto &cr : candRects_) {
+        right = std::max(right, cr.rect.right());
+    }
+    right = std::max(right, pageDownRect_.right());
+
+    QFont preeditFont;
+    preeditFont.setPointSize(fontSize_ - 1);
+    QFontMetrics pfm(preeditFont);
+    int preeditWidth = pfm.horizontalAdvance(preeditText_) + kPadding * 2;
+
+    int w = std::max(static_cast<int>(right) + kPadding, preeditWidth);
+    w = std::max(w, 150);
+
+    return {w, kPreeditHeight + kHeight};
+}
+
+int CandidateView::hitTestCandidate(const QPoint &pos) const {
+    for (const auto &cr : candRects_) {
+        if (cr.rect.contains(pos)) return cr.index;
+    }
+    return -1;
+}
+
+void CandidateView::paintEvent(QPaintEvent *) {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::TextAntialiasing, true);
+
+    QRectF bgRect = QRectF(rect()).adjusted(1, 1, -1, -1);
+    QPainterPath bgPath;
+    bgPath.addRoundedRect(bgRect, borderRadius_, borderRadius_);
+    p.fillPath(bgPath, bgColor_);
+    p.setPen(QPen(borderColor_, 1));
+    p.drawPath(bgPath);
+
+    if (!preeditText_.isEmpty()) {
+        QFont preeditFont;
+        preeditFont.setPointSize(fontSize_ - 1);
+        p.setFont(preeditFont);
+        p.setPen(preeditColor_);
+        QRectF preeditRect(kPadding, 2, width() - kPadding * 2, kPreeditHeight);
+        p.drawText(preeditRect, Qt::AlignVCenter | Qt::AlignLeft, preeditText_);
+
+        p.setPen(QPen(borderColor_, 0.5));
+        p.drawLine(QPointF(kPadding, kPreeditHeight),
+                   QPointF(width() - kPadding, kPreeditHeight));
+    }
+
     QFont font;
-    switch (skin_) {
-    case Skin::Light:
-    case Skin::Dark:
-        font.setPointSize(12);
-        break;
-    case Skin::Blue:
-        font.setPointSize(13);
-        break;
+    font.setPointSize(fontSize_);
+
+    for (int i = 0; i < candRects_.size(); ++i) {
+        const auto &cr = candRects_[i];
+
+        if (hoveredCandidate_ == cr.index) {
+            QPainterPath hp;
+            hp.addRoundedRect(cr.rect.adjusted(0, 4, 0, -4), 4, 4);
+            p.fillPath(hp, QColor(highlightColor_.red(), highlightColor_.green(),
+                                  highlightColor_.blue(), 30));
+        }
+
+        QString indexStr = QString::number(cr.index + 1) + QStringLiteral(". ");
+        QString candText = candidates_[cr.index];
+
+        p.setFont(font);
+
+        QRectF indexRect(cr.rect.left() + 4, cr.rect.top(), 24, cr.rect.height());
+        p.setPen(cr.index == 0 ? highlightColor_ : indexColor_);
+        p.drawText(indexRect, Qt::AlignVCenter | Qt::AlignLeft, indexStr);
+
+        int indexW = p.fontMetrics().horizontalAdvance(indexStr);
+        QRectF textRect(cr.rect.left() + 4 + indexW, cr.rect.top(),
+                        cr.rect.width() - indexW - 8, cr.rect.height());
+        p.setPen(cr.index == 0 ? highlightColor_ : textColor_);
+        p.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, candText);
     }
-    QFontMetrics fm(font);
-    int width = 32;
-    for (int i = 0; i < candidates_.size(); ++i) {
-        const QString text = QString::number(i + 1) + ". " + candidates_.at(i);
-        width += fm.horizontalAdvance(text) + 24;
+
+    if (totalPages_ > 1) {
+        QFont arrowFont;
+        arrowFont.setPointSize(10);
+        p.setFont(arrowFont);
+
+        p.setPen(currentPage_ > 1 ? textColor_ : QColor(180, 180, 180));
+        p.drawText(pageUpRect_, Qt::AlignCenter, QStringLiteral("<"));
+
+        p.setPen(currentPage_ < totalPages_ ? textColor_ : QColor(180, 180, 180));
+        p.drawText(pageDownRect_, Qt::AlignCenter, QStringLiteral(">"));
+
+        QFont pageFont;
+        pageFont.setPointSize(9);
+        p.setFont(pageFont);
+        p.setPen(indexColor_);
+        QString pageText = QString::number(currentPage_) + QStringLiteral("/")
+                           + QString::number(totalPages_);
+        QRectF pageRect(pageDownRect_.right() + 2, pageDownRect_.top(),
+                        40, pageDownRect_.height());
+        p.drawText(pageRect, Qt::AlignVCenter | Qt::AlignLeft, pageText);
     }
-    return {width, 40};
 }
 
 void CandidateView::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
+        int idx = hitTestCandidate(event->pos());
+        if (idx >= 0) {
+            emit candidateClicked(idx);
+            event->accept();
+            return;
+        }
+
+        if (pageUpRect_.contains(event->pos())) {
+            emit pageUpClicked();
+            event->accept();
+            return;
+        }
+        if (pageDownRect_.contains(event->pos())) {
+            emit pageDownClicked();
+            event->accept();
+            return;
+        }
+
         dragging_ = true;
         dragPosition_ = event->globalPosition().toPoint() - frameGeometry().topLeft();
         setCursor(Qt::SizeAllCursor);
@@ -117,6 +218,16 @@ void CandidateView::mouseMoveEvent(QMouseEvent *event) {
         event->accept();
         return;
     }
+
+    int idx = hitTestCandidate(event->pos());
+    if (idx != hoveredCandidate_) {
+        hoveredCandidate_ = idx;
+        if (idx >= 0)
+            setCursor(Qt::PointingHandCursor);
+        else
+            unsetCursor();
+        update();
+    }
     QFrame::mouseMoveEvent(event);
 }
 
@@ -129,27 +240,3 @@ void CandidateView::mouseReleaseEvent(QMouseEvent *event) {
     }
     QFrame::mouseReleaseEvent(event);
 }
-
-void CandidateView::contextMenuEvent(QContextMenuEvent *event) {
-    QMenu menu(this);
-    QAction *darkAction = menu.addAction(QStringLiteral("暗色皮肤"));
-    QAction *lightAction = menu.addAction(QStringLiteral("亮色皮肤"));
-    QAction *blueAction = menu.addAction(QStringLiteral("蓝色皮肤"));
-
-    QAction *selected = menu.exec(event->globalPos());
-    if (!selected) {
-        return;
-    }
-
-    if (selected == darkAction) {
-        skin_ = Skin::Dark;
-    } else if (selected == lightAction) {
-        skin_ = Skin::Light;
-    } else if (selected == blueAction) {
-        skin_ = Skin::Blue;
-    }
-    updateGeometry();
-    update();
-}
-
-

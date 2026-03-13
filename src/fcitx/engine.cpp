@@ -10,11 +10,13 @@ Engine::Engine()
 
 Engine::~Engine() = default;
 
-void Engine::handleKeyEvent(int keySym, int keyState) {
+void Engine::handleKeyEvent(int keySym, int /*keyState*/) {
     if (!context_) {
         return;
     }
-    context_->handleKeyEvent(keySym, keyState);
+    if (keySym >= 32 && keySym < 127) {
+        context_->handleKey(static_cast<char>(keySym));
+    }
 }
 
 std::string Engine::preeditText() const {
@@ -41,8 +43,7 @@ void Engine::commitCandidate(std::size_t index) {
     if (!context_) {
         return;
     }
-    context_->commitCandidate(index);
+    context_->selectCandidate(index);
 }
 
 } // namespace fcitx_adapter
-

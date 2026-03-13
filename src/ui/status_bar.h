@@ -5,6 +5,7 @@
 #include <QString>
 #include <QVector>
 #include <QRectF>
+#include <QColor>
 
 class QMouseEvent;
 class QPaintEvent;
@@ -25,8 +26,10 @@ public:
     void setPunctuationMode(PunctuationMode mode);
     PunctuationMode punctuationMode() const { return punctuationMode_; }
 
-    enum class Skin { Dark, Light, Blue };
-    void setSkin(Skin skin);
+    void applySkinColors(const QColor &bg, const QColor &border,
+                         const QColor &text, const QColor &hover,
+                         const QColor &logo, const QColor &ai,
+                         int borderRadius);
 
 signals:
     void inputModeToggled(InputMode mode);
@@ -56,7 +59,14 @@ private:
 
     InputMode inputMode_ = InputMode::Chinese;
     PunctuationMode punctuationMode_ = PunctuationMode::Chinese;
-    Skin skin_ = Skin::Light;
+
+    QColor bgColor_{255, 255, 255, 245};
+    QColor borderColor_{210, 210, 210};
+    QColor textColor_{50, 50, 50};
+    QColor hoverColor_{0, 0, 0, 18};
+    QColor logoColor_{255, 120, 0};
+    QColor aiColor_{40, 130, 220};
+    int borderRadius_ = 6;
 
     QVector<ButtonItem> buttons_;
     bool dragging_ = false;
