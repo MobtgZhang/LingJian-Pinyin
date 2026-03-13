@@ -1,2 +1,0 @@
-/usr/bin/ar qc liblingjian_dict.a CMakeFiles/lingjian_dict.dir/dictionary_placeholder.cpp.o
-/usr/bin/ranlib liblingjian_dict.a

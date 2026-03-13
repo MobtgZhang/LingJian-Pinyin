@@ -1,4 +1,0 @@
-# Hashes of file build rules.
-f22c57a45920770354ac8ea4131dde08 src/ui/CMakeFiles/lingjian_ui_autogen
-f22c57a45920770354ac8ea4131dde08 src/ui/CMakeFiles/lingjian_ui_autogen_timestamp_deps
-7f6044658256328ebbefb4faa94893d6 src/ui/lingjian_ui_autogen/timestamp
