@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 
     auto *hintLabel = new QLabel(QStringLiteral(
         "提示：在下方输入框中输入拼音，候选栏会自动弹出。\n"
-        "空格键选第一个候选，数字键1-5选候选词，-/=翻页，Esc取消输入。\n"
+        "空格键选当前候选，数字键1-5选候选词，-/=翻页，←→左右选字，Esc取消输入。\n"
         "点击状态栏「中/英」按钮或右键菜单切换输入模式。\n"
         "点击「🎨」按钮加载皮肤ZIP文件（参考搜狗皮肤格式）。"));
     hintLabel->setWordWrap(true);
@@ -174,6 +174,7 @@ int main(int argc, char *argv[]) {
             items << QString::fromStdString(c.text);
         candidateView.setCandidates(items);
         candidateView.setPageInfo(ctx->currentPage() + 1, ctx->totalPages());
+        candidateView.setHighlightedIndex(ctx->currentCursorIndex());
     });
 
     QObject::connect(&candidateView, &CandidateView::pageDownClicked,
@@ -185,6 +186,7 @@ int main(int argc, char *argv[]) {
             items << QString::fromStdString(c.text);
         candidateView.setCandidates(items);
         candidateView.setPageInfo(ctx->currentPage() + 1, ctx->totalPages());
+        candidateView.setHighlightedIndex(ctx->currentCursorIndex());
     });
 
     auto *softKeyboard = new SoftKeyboard;

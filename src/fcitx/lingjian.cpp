@@ -81,10 +81,32 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
 
     if (key.check(FcitxKey_space)) {
         if (ctx_.isComposing()) {
-            auto r = ctx_.handleKey(' ');
-            if (r == core::InputContext::KeyResult::Committed) {
-                ic_->commitString(ctx_.committedText());
-                ctx_.clearCommitted();
+            auto list = ic_->inputPanel().candidateList();
+            int idxToSelect = 0;
+            if (list && !list->empty()) {
+                auto *pageable = list->toPageable();
+                auto *bulk = list->toBulk();
+                if (pageable && bulk && bulk->totalSize() > 0) {
+                    int page = pageable->currentPage();
+                    int cursor = list->cursorIndex();
+                    if (page >= 0 && cursor >= 0) {
+                        int globalIdx = page * ctx_.pageSize() + cursor;
+                        if (globalIdx < bulk->totalSize()) {
+                            idxToSelect = globalIdx;
+                            bulk->candidateFromAll(idxToSelect).select(ic_);
+                            updateUI();
+                            event.filterAndAccept();
+                            return;
+                        }
+                    }
+                }
+                list->candidate(0).select(ic_);
+            } else {
+                auto r = ctx_.handleKey(' ');
+                if (r == core::InputContext::KeyResult::Committed) {
+                    ic_->commitString(ctx_.committedText());
+                    ctx_.clearCommitted();
+                }
             }
             updateUI();
             event.filterAndAccept();
@@ -103,6 +125,23 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
     if (key.check(FcitxKey_equal) || key.check(FcitxKey_Page_Down)) {
         if (ctx_.isComposing()) {
             handlePageNavigation(false);
+            event.filterAndAccept();
+        }
+        return;
+    }
+
+    if (key.check(FcitxKey_Left) || key.check(FcitxKey_Right)) {
+        if (ctx_.isComposing()) {
+            auto list = ic_->inputPanel().candidateList();
+            auto *cursorMovable = list ? list->toCursorMovable() : nullptr;
+            if (cursorMovable) {
+                if (key.check(FcitxKey_Left)) {
+                    cursorMovable->prevCandidate();
+                } else {
+                    cursorMovable->nextCandidate();
+                }
+                ic_->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
+            }
             event.filterAndAccept();
         }
         return;

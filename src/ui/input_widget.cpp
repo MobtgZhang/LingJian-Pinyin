@@ -79,7 +79,8 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
     }
 
     if (key == Qt::Key_Space && ctx_->isComposing()) {
-        auto r = ctx_->handleKey(' ');
+        int globalIdx = ctx_->currentPage() * ctx_->pageSize() + ctx_->currentCursorIndex();
+        auto r = ctx_->selectCandidate(static_cast<std::size_t>(globalIdx));
         if (r == core::InputContext::KeyResult::Committed) {
             commitText(QString::fromStdString(ctx_->committedText()));
             ctx_->clearCommitted();
@@ -110,6 +111,22 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
     if (key == Qt::Key_Equal || key == Qt::Key_PageDown) {
         if (ctx_->isComposing()) {
             ctx_->handlePageDown();
+            updateCandidateView();
+            return;
+        }
+    }
+
+    if (key == Qt::Key_Left) {
+        if (ctx_->isComposing()) {
+            ctx_->handleCursorLeft();
+            updateCandidateView();
+            return;
+        }
+    }
+
+    if (key == Qt::Key_Right) {
+        if (ctx_->isComposing()) {
+            ctx_->handleCursorRight();
             updateCandidateView();
             return;
         }
@@ -155,6 +172,7 @@ void InputWidget::updateCandidateView() {
     candidateView_->setPreeditText(preedit);
     candidateView_->setCandidates(items);
     candidateView_->setPageInfo(ctx_->currentPage() + 1, ctx_->totalPages());
+    candidateView_->setHighlightedIndex(ctx_->currentCursorIndex());
 
     positionCandidateView();
     candidateView_->show();

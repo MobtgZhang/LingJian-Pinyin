@@ -99,6 +99,7 @@ InputContext::KeyResult InputContext::selectCandidate(std::size_t index) {
 InputContext::KeyResult InputContext::handlePageDown() {
     if (currentPage_ < totalPages() - 1) {
         ++currentPage_;
+        cursorIndex_ = 0;
         return KeyResult::Consumed;
     }
     return KeyResult::Ignored;
@@ -107,6 +108,7 @@ InputContext::KeyResult InputContext::handlePageDown() {
 InputContext::KeyResult InputContext::handlePageUp() {
     if (currentPage_ > 0) {
         --currentPage_;
+        cursorIndex_ = 0;
         return KeyResult::Consumed;
     }
     return KeyResult::Ignored;
@@ -147,11 +149,25 @@ std::vector<CoreCandidate> InputContext::currentPageCandidates() const {
 
 void InputContext::updateCandidates() {
     currentPage_ = 0;
+    cursorIndex_ = 0;
     if (composingPinyin_.empty()) {
         allCandidates_.clear();
         return;
     }
     allCandidates_ = decoder_->decode(composingPinyin_);
+}
+
+void InputContext::handleCursorLeft() {
+    if (cursorIndex_ > 0) {
+        --cursorIndex_;
+    }
+}
+
+void InputContext::handleCursorRight() {
+    int pageCount = static_cast<int>(currentPageCandidates().size());
+    if (cursorIndex_ < pageCount - 1) {
+        ++cursorIndex_;
+    }
 }
 
 } // namespace core

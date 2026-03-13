@@ -1,0 +1,2 @@
+/usr/bin/ar qc liblingjian_utils.a CMakeFiles/lingjian_utils.dir/utils_placeholder.cpp.o
+/usr/bin/ranlib liblingjian_utils.a

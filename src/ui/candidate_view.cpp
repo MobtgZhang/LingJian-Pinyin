@@ -1,5 +1,6 @@
 #include "candidate_view.h"
 
+#include <algorithm>
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
@@ -31,6 +32,15 @@ void CandidateView::setPageInfo(int current, int total) {
     currentPage_ = current;
     totalPages_ = total;
     update();
+}
+
+void CandidateView::setHighlightedIndex(int index) {
+    int maxIdx = std::max(0, static_cast<int>(candidates_.size()) - 1);
+    int clamped = std::clamp(index, 0, maxIdx);
+    if (highlightedIndex_ != clamped) {
+        highlightedIndex_ = clamped;
+        update();
+    }
 }
 
 void CandidateView::applySkinColors(const QColor &bg, const QColor &border,
@@ -137,7 +147,9 @@ void CandidateView::paintEvent(QPaintEvent *) {
     for (int i = 0; i < candRects_.size(); ++i) {
         const auto &cr = candRects_[i];
 
-        if (hoveredCandidate_ == cr.index) {
+        bool isHighlighted = (hoveredCandidate_ == cr.index) ||
+                             (highlightedIndex_ == cr.index);
+        if (isHighlighted) {
             QPainterPath hp;
             hp.addRoundedRect(cr.rect.adjusted(0, 4, 0, -4), 4, 4);
             p.fillPath(hp, QColor(highlightColor_.red(), highlightColor_.green(),
@@ -150,13 +162,13 @@ void CandidateView::paintEvent(QPaintEvent *) {
         p.setFont(font);
 
         QRectF indexRect(cr.rect.left() + 4, cr.rect.top(), 24, cr.rect.height());
-        p.setPen(cr.index == 0 ? highlightColor_ : indexColor_);
+        p.setPen(highlightedIndex_ == cr.index ? highlightColor_ : indexColor_);
         p.drawText(indexRect, Qt::AlignVCenter | Qt::AlignLeft, indexStr);
 
         int indexW = p.fontMetrics().horizontalAdvance(indexStr);
         QRectF textRect(cr.rect.left() + 4 + indexW, cr.rect.top(),
                         cr.rect.width() - indexW - 8, cr.rect.height());
-        p.setPen(cr.index == 0 ? highlightColor_ : textColor_);
+        p.setPen(highlightedIndex_ == cr.index ? highlightColor_ : textColor_);
         p.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, candText);
     }
 
@@ -166,10 +178,10 @@ void CandidateView::paintEvent(QPaintEvent *) {
         p.setFont(arrowFont);
 
         p.setPen(currentPage_ > 1 ? textColor_ : QColor(180, 180, 180));
-        p.drawText(pageUpRect_, Qt::AlignCenter, QStringLiteral("<"));
+        p.drawText(pageUpRect_, Qt::AlignCenter, QStringLiteral("\u25C0"));
 
         p.setPen(currentPage_ < totalPages_ ? textColor_ : QColor(180, 180, 180));
-        p.drawText(pageDownRect_, Qt::AlignCenter, QStringLiteral(">"));
+        p.drawText(pageDownRect_, Qt::AlignCenter, QStringLiteral("\u25B6"));
 
         QFont pageFont;
         pageFont.setPointSize(9);

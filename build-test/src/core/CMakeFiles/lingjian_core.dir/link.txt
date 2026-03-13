@@ -1,0 +1,2 @@
+/usr/bin/ar qc liblingjian_core.a CMakeFiles/lingjian_core.dir/context.cpp.o CMakeFiles/lingjian_core.dir/decoder.cpp.o CMakeFiles/lingjian_core.dir/dictionary.cpp.o CMakeFiles/lingjian_core.dir/pinyin_segmenter.cpp.o CMakeFiles/lingjian_core.dir/language_model.cpp.o CMakeFiles/lingjian_core.dir/sentence_decoder.cpp.o
+/usr/bin/ranlib liblingjian_core.a

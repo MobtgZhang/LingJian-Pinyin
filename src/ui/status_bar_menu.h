@@ -4,6 +4,9 @@
 #include <QVector>
 #include <QRectF>
 #include <QString>
+#include <QTimer>
+
+class HelpSubmenu;
 
 class StatusBarMenu : public QWidget {
     Q_OBJECT
@@ -31,6 +34,7 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void enterEvent(QEnterEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
@@ -52,6 +56,9 @@ private:
     void buildLayout();
     int toggleHitTest(const QPoint &pos) const;
     int itemHitTest(const QPoint &pos) const;
+    void showHelpSubmenu();
+    void closeHelpSubmenuIfNeeded();
+    void checkCursorOverMainMenu();
 
     QVector<ToggleItem> toggles_;
     QVector<MenuItem> items_;
@@ -60,6 +67,11 @@ private:
     int hoveredToggle_ = -1;
     int hoveredItem_ = -1;
     int contentHeight_ = 0;
+
+    HelpSubmenu *helpSubmenu_ = nullptr;
+    QTimer hoverSubmenuTimer_;
+    QTimer submenuCloseTimer_;
+    QTimer checkCursorTimer_;
 
     static constexpr int kMenuWidth = 230;
     static constexpr int kTopSectionHeight = 88;

@@ -5,8 +5,10 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
+#include <QEnterEvent>
 #include <QApplication>
 #include <QScreen>
+#include <QCursor>
 
 StatusBarMenu::StatusBarMenu(QWidget *parent)
     : QWidget(parent)
@@ -14,6 +16,11 @@ StatusBarMenu::StatusBarMenu(QWidget *parent)
     setWindowFlags(Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
     setMouseTracking(true);
+    hoverSubmenuTimer_.setSingleShot(true);
+    connect(&hoverSubmenuTimer_, &QTimer::timeout, this, &StatusBarMenu::showHelpSubmenu);
+    submenuCloseTimer_.setSingleShot(true);
+    connect(&submenuCloseTimer_, &QTimer::timeout, this, &StatusBarMenu::closeHelpSubmenuIfNeeded);
+    connect(&checkCursorTimer_, &QTimer::timeout, this, &StatusBarMenu::checkCursorOverMainMenu);
     buildLayout();
 }
 
@@ -243,6 +250,33 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
     }
 }
 
+void StatusBarMenu::enterEvent(QEnterEvent *event) {
+    // 鼠标从子菜单滑回主菜单时，若停在其他选项上则关闭二级菜单
+    QPoint pos = event->position().toPoint();
+    int nt = toggleHitTest(pos);
+    int ni = itemHitTest(pos);
+    if (helpSubmenu_ && helpSubmenu_->isVisible() && (nt >= 0 || (ni >= 0 && ni != 8))) {
+        helpSubmenu_->close();
+        helpSubmenu_ = nullptr;
+    }
+    if (nt >= 0 || ni >= 0) {
+        hoveredToggle_ = nt;
+        hoveredItem_ = ni;
+        if (ni == 8) {
+            hoverSubmenuTimer_.start(100);
+        } else {
+            hoverSubmenuTimer_.stop();
+            if (helpSubmenu_ && helpSubmenu_->isVisible()) {
+                helpSubmenu_->close();
+                helpSubmenu_ = nullptr;
+            }
+        }
+        setCursor(Qt::PointingHandCursor);
+    }
+    update();
+    QWidget::enterEvent(event);
+}
+
 void StatusBarMenu::mouseMoveEvent(QMouseEvent *event) {
     int nt = toggleHitTest(event->pos());
     int ni = itemHitTest(event->pos());
@@ -250,6 +284,17 @@ void StatusBarMenu::mouseMoveEvent(QMouseEvent *event) {
     if (nt != hoveredToggle_ || ni != hoveredItem_) {
         hoveredToggle_ = nt;
         hoveredItem_ = ni;
+
+        // 滑到「帮助」弹出二级菜单（关于灵键），滑到其他选项关闭二级菜单
+        if (ni == 8) {
+            hoverSubmenuTimer_.start(100);
+        } else {
+            hoverSubmenuTimer_.stop();
+            if (helpSubmenu_ && helpSubmenu_->isVisible()) {
+                helpSubmenu_->close();
+                helpSubmenu_ = nullptr;
+            }
+        }
 
         if (nt >= 0 || ni >= 0)
             setCursor(Qt::PointingHandCursor);
@@ -282,19 +327,11 @@ void StatusBarMenu::mousePressEvent(QMouseEvent *event) {
     int mi = itemHitTest(event->pos());
     if (mi >= 0) {
         if (mi == 8) {
-            // 帮助：弹出自定义样式二级菜单
-            HelpSubmenu *helpSubmenu = new HelpSubmenu(this);
-            connect(helpSubmenu, &HelpSubmenu::aboutClicked, this, [this]() {
-                emit aboutClicked();
-                close();
-            });
-            connect(helpSubmenu, &QWidget::destroyed, this, [this]() {
-                close();
-            });
-            QRectF helpRect = items_[8].rect;
-            QPoint submenuPos = mapToGlobal(QPoint(static_cast<int>(helpRect.right()),
-                                                   static_cast<int>(helpRect.top())));
-            helpSubmenu->popup(submenuPos);
+            // 帮助：二级菜单已通过悬停显示，点击时若子菜单已打开则不做处理（点击会传递到子菜单）
+            // 若用户快速点击未悬停，则立即显示子菜单
+            if (!helpSubmenu_ || !helpSubmenu_->isVisible()) {
+                showHelpSubmenu();
+            }
             return;
         }
         switch (mi) {
@@ -316,9 +353,64 @@ void StatusBarMenu::mousePressEvent(QMouseEvent *event) {
     close();
 }
 
+void StatusBarMenu::showHelpSubmenu() {
+    if (helpSubmenu_ && helpSubmenu_->isVisible())
+        return;
+    if (helpSubmenu_) {
+        helpSubmenu_->close();
+        helpSubmenu_ = nullptr;
+    }
+    helpSubmenu_ = new HelpSubmenu(this);
+    connect(helpSubmenu_, &HelpSubmenu::aboutClicked, this, [this]() {
+        emit aboutClicked();
+        close();
+    });
+    connect(helpSubmenu_, &QWidget::destroyed, this, [this]() {
+        helpSubmenu_ = nullptr;
+        checkCursorTimer_.stop();
+    });
+    QRectF helpRect = items_[8].rect;
+    QPoint submenuPos = mapToGlobal(QPoint(static_cast<int>(helpRect.right() - 4),
+                                           static_cast<int>(helpRect.top())));
+    helpSubmenu_->popup(submenuPos);
+    checkCursorTimer_.start(50);
+}
+
+void StatusBarMenu::closeHelpSubmenuIfNeeded() {
+    if (!helpSubmenu_ || !helpSubmenu_->isVisible())
+        return;
+    QPoint gp = QCursor::pos();
+    QRect subGeom = helpSubmenu_->geometry();
+    if (subGeom.contains(gp))
+        return;
+    checkCursorTimer_.stop();
+    helpSubmenu_->close();
+    helpSubmenu_ = nullptr;
+}
+
+void StatusBarMenu::checkCursorOverMainMenu() {
+    if (!helpSubmenu_ || !helpSubmenu_->isVisible())
+        return;
+    QPoint gp = QCursor::pos();
+    QPoint localPos = mapFromGlobal(gp);
+    if (!rect().contains(localPos))
+        return;
+    int nt = toggleHitTest(localPos);
+    int ni = itemHitTest(localPos);
+    if (nt >= 0 || (ni >= 0 && ni != 8)) {
+        checkCursorTimer_.stop();
+        helpSubmenu_->close();
+        helpSubmenu_ = nullptr;
+    }
+}
+
 void StatusBarMenu::leaveEvent(QEvent *) {
     hoveredToggle_ = -1;
     hoveredItem_ = -1;
+    hoverSubmenuTimer_.stop();
+    if (helpSubmenu_ && helpSubmenu_->isVisible()) {
+        submenuCloseTimer_.start(150);
+    }
     unsetCursor();
     update();
 }

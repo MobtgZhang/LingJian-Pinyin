@@ -17,6 +17,7 @@ public:
     void setCandidates(const QStringList &candidates);
     void setPreeditText(const QString &text);
     void setPageInfo(int current, int total);
+    void setHighlightedIndex(int index);
 
     void applySkinColors(const QColor &bg, const QColor &border,
                          const QColor &text, const QColor &highlight,
@@ -60,6 +61,7 @@ private:
     QVector<CandRect> candRects_;
     QRectF pageUpRect_;
     QRectF pageDownRect_;
+    int highlightedIndex_ = 0;
     int hoveredCandidate_ = -1;
 
     bool dragging_ = false;

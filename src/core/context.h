@@ -35,6 +35,9 @@ public:
 
     KeyResult handlePageDown();
     KeyResult handlePageUp();
+    void handleCursorLeft();
+    void handleCursorRight();
+    int currentCursorIndex() const { return cursorIndex_; }
 
     std::string preeditText() const;
     std::string segmentedPreedit() const;
@@ -58,6 +61,7 @@ private:
     std::vector<CoreCandidate> allCandidates_;
     std::string committedText_;
     int currentPage_ = 0;
+    int cursorIndex_ = 0;
     int pageSize_ = 5;
 };
 
