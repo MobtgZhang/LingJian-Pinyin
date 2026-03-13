@@ -1,5 +1,6 @@
 #include "status_bar.h"
 #include "status_bar_menu.h"
+#include "about_dialog.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -288,6 +289,11 @@ void StatusBar::ensureContextMenu() {
             this, &StatusBar::skinClicked);
     connect(contextMenu_, &StatusBarMenu::aiToolsClicked,
             this, &StatusBar::aiClicked);
+    connect(contextMenu_, &StatusBarMenu::aboutClicked, this, [this]() {
+        AboutDialog *about = new AboutDialog(this);
+        about->setAttribute(Qt::WA_DeleteOnClose);
+        about->showCentered(window());
+    });
 }
 
 void StatusBar::contextMenuEvent(QContextMenuEvent *event) {

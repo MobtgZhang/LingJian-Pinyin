@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QSystemTrayIcon>
 #include <QPainter>
+#include <QImage>
 
 #include "candidate_view.h"
 #include "input_widget.h"
@@ -23,19 +24,24 @@
 
 static QIcon createLingTrayIcon() {
     const int size = 22;
-    QPixmap pix(size, size);
-    pix.fill(Qt::transparent);
-    QPainter p(&pix);
+    QImage img(size, size, QImage::Format_ARGB32);
+    img.fill(0);
+    QPainter p;
+    if (!p.begin(&img)) return QIcon();
     p.setRenderHint(QPainter::Antialiasing, true);
     p.setRenderHint(QPainter::TextAntialiasing, true);
+    // 浅色圆形背景 + 深色文字，在深色/浅色托盘主题下都清晰可见
+    p.setBrush(QColor(248, 248, 248));
+    p.setPen(Qt::NoPen);
+    p.drawEllipse(2, 2, size - 4, size - 4);
     QFont font;
-    font.setPointSize(13);
+    font.setPointSize(12);
     font.setWeight(QFont::Bold);
     p.setFont(font);
-    p.setPen(QColor(30, 30, 30));
+    p.setPen(QColor(50, 50, 50));
     p.drawText(QRect(0, 0, size, size), Qt::AlignCenter, QStringLiteral("\u7075"));
     p.end();
-    return QIcon(pix);
+    return QIcon(QPixmap::fromImage(img));
 }
 
 static QString findDictPath() {

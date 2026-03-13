@@ -1,4 +1,6 @@
 #include "status_bar_menu.h"
+#include "help_submenu.h"
+#include "theme_manager.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -118,6 +120,12 @@ int StatusBarMenu::itemHitTest(const QPoint &pos) const {
 }
 
 void StatusBarMenu::paintEvent(QPaintEvent *) {
+    const auto &skin = ThemeManager::instance().skin();
+    const bool isDark = skin.cvBackground.lightness() < 128;
+    const QColor hoverOverlay = isDark ? QColor(255, 255, 255, 40) : QColor(0, 0, 0, 35);
+    const QColor subTextColor = isDark ? QColor(180, 180, 180) : QColor(160, 160, 160);
+    const QColor arrowColor = isDark ? QColor(140, 140, 140) : QColor(185, 185, 185);
+
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     p.setRenderHint(QPainter::TextAntialiasing, true);
@@ -136,11 +144,11 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
         p.fillPath(sp, QColor(0, 0, 0, l.alpha));
     }
 
-    // --- White background ---
+    // --- Background (使用当前皮肤) ---
     QPainterPath bgPath;
     bgPath.addRoundedRect(contentRect, kRadius, kRadius);
-    p.fillPath(bgPath, QColor(255, 255, 255, 252));
-    p.setPen(QPen(QColor(225, 225, 225), 0.5));
+    p.fillPath(bgPath, skin.cvBackground);
+    p.setPen(QPen(skin.cvBorder, 0.5));
     p.drawPath(bgPath);
 
     // --- Clip to content ---
@@ -160,25 +168,25 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
         if (hoveredToggle_ == i) {
             QPainterPath hp;
             hp.addRoundedRect(t.rect.adjusted(2, 1, -2, -1), 8, 8);
-            p.fillPath(hp, QColor(0, 0, 0, 35));
+            p.fillPath(hp, hoverOverlay);
         }
 
         QRectF charRect(t.rect.left(), t.rect.top(),
                         t.rect.width(), t.rect.height() * 0.62);
         p.setFont(charFont);
-        p.setPen(QColor(55, 55, 55));
+        p.setPen(skin.cvText);
         p.drawText(charRect, Qt::AlignCenter, t.character);
 
         QRectF subRect(t.rect.left(), t.rect.top() + t.rect.height() * 0.58,
                        t.rect.width(), t.rect.height() * 0.38);
         p.setFont(subtitleFont);
-        p.setPen(QColor(160, 160, 160));
+        p.setPen(subTextColor);
         p.drawText(subRect, Qt::AlignHCenter | Qt::AlignTop, t.subtitle);
     }
 
     // --- Separators ---
+    p.setPen(QPen(skin.cvSeparator, 1));
     for (qreal sy : separatorYs_) {
-        p.setPen(QPen(QColor(235, 235, 235), 1));
         p.drawLine(QPointF(kShadowMargin + kHPadding, sy + 0.5),
                    QPointF(kShadowMargin + kMenuWidth - kHPadding, sy + 0.5));
     }
@@ -198,16 +206,16 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
         if (hoveredItem_ == i) {
             QPainterPath hp;
             hp.addRoundedRect(r.adjusted(2, 1, -2, -1), 6, 6);
-            p.fillPath(hp, QColor(0, 0, 0, 35));
+            p.fillPath(hp, hoverOverlay);
         }
 
         QFont drawIconFont = iconFont;
-        QColor iconColor(80, 80, 80);
+        QColor iconColor = skin.cvText;
 
         if (item.icon == QStringLiteral("Ai")) {
             drawIconFont.setPointSize(13);
             drawIconFont.setWeight(QFont::Bold);
-            iconColor = QColor(40, 130, 220);
+            iconColor = skin.sbAi;
         } else if (item.icon == QStringLiteral("\u7b26")) {
             drawIconFont.setPointSize(16);
             drawIconFont.setWeight(QFont::Bold);
@@ -219,7 +227,7 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
         p.drawText(iconRect, Qt::AlignCenter, item.icon);
 
         p.setFont(textFont);
-        p.setPen(QColor(50, 50, 50));
+        p.setPen(skin.cvText);
         QRectF textRect(r.left() + kHPadding + 38, r.top(),
                         r.width() - kHPadding * 2 - 56, r.height());
         p.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, item.text);
@@ -228,7 +236,7 @@ void StatusBarMenu::paintEvent(QPaintEvent *) {
             QFont arrowFont;
             arrowFont.setPointSize(13);
             p.setFont(arrowFont);
-            p.setPen(QColor(185, 185, 185));
+            p.setPen(arrowColor);
             QRectF arrowRect(r.right() - kHPadding - 16, r.top(), 16, r.height());
             p.drawText(arrowRect, Qt::AlignCenter, QStringLiteral("\u203A"));
         }
@@ -273,6 +281,22 @@ void StatusBarMenu::mousePressEvent(QMouseEvent *event) {
 
     int mi = itemHitTest(event->pos());
     if (mi >= 0) {
+        if (mi == 8) {
+            // 帮助：弹出自定义样式二级菜单
+            HelpSubmenu *helpSubmenu = new HelpSubmenu(this);
+            connect(helpSubmenu, &HelpSubmenu::aboutClicked, this, [this]() {
+                emit aboutClicked();
+                close();
+            });
+            connect(helpSubmenu, &QWidget::destroyed, this, [this]() {
+                close();
+            });
+            QRectF helpRect = items_[8].rect;
+            QPoint submenuPos = mapToGlobal(QPoint(static_cast<int>(helpRect.right()),
+                                                   static_cast<int>(helpRect.top())));
+            helpSubmenu->popup(submenuPos);
+            return;
+        }
         switch (mi) {
         case 0: emit voiceInputClicked(); break;
         case 1: emit symbolsClicked(); break;
@@ -282,8 +306,8 @@ void StatusBarMenu::mousePressEvent(QMouseEvent *event) {
         case 5: emit skinStoreClicked(); break;
         case 6: emit aiToolsClicked(); break;
         case 7: emit customizeStatusBarClicked(); break;
-        case 8: emit helpClicked(); break;
         case 9: emit globalSettingsClicked(); break;
+        default: break;
         }
         close();
         return;

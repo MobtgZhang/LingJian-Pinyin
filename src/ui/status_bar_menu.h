@@ -26,6 +26,7 @@ signals:
     void aiToolsClicked();
     void customizeStatusBarClicked();
     void helpClicked();
+    void aboutClicked();
     void globalSettingsClicked();
 
 protected:

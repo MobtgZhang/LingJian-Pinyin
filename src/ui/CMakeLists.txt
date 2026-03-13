@@ -4,8 +4,12 @@ set(CMAKE_AUTOMOC ON)
 
 add_executable(lingjian_ui
     main.cpp
+    about_dialog.cpp
+    about_dialog.h
     candidate_view.cpp
     candidate_view.h
+    help_submenu.cpp
+    help_submenu.h
     status_bar.cpp
     status_bar.h
     status_bar_menu.cpp
