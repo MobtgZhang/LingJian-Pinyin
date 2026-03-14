@@ -12,7 +12,7 @@
 - **状态栏协调**：状态栏和候选栏自动联动，中/英文模式切换
 - **皮肤滑动选择器**：点击皮肤按钮弹出滑动窗口，可视化预览并选择 8 种内置皮肤
 - **自定义皮肤**：支持从 ZIP 文件加载皮肤，兼容搜狗皮肤格式（skin.ini + 图片资源）
-- **词典支持**：内置约 2500+ 条拼音词典数据，覆盖常用汉字和词组
+- **词典支持**：基于 [rime-ice 雾凇拼音](https://github.com/iDvel/rime-ice) 词库，约 88 万+ 词条，覆盖常用汉字和词组
 
 ## 输入法架构
 
@@ -50,6 +50,17 @@ Beam Search (SentenceDecoder)
 - `src/dict/`：系统词典、用户词典实现
 - `src/utils/`：工具函数
 - `data/`：拼音词典数据、皮肤资源文件
+- `scripts/`：词库更新脚本
+
+### 更新词库
+
+词库源自 [rime-ice 雾凇拼音](https://github.com/iDvel/rime-ice)，可通过脚本更新：
+
+```bash
+python3 scripts/update_dict_from_rime.py
+```
+
+脚本会下载 8105 字表、base、ext、others 词库，转换为灵键格式并合并到 `data/pinyin_dict.txt`。
 
 ## 使用说明
 
@@ -111,6 +122,7 @@ sudo dpkg -i lingjian-pinyin_0.1.0_amd64.deb
 | Escape      | 取消当前拼音输入           |
 | Enter       | 将拼音原文上屏             |
 | - / =       | 上一页 / 下一页           |
+| ↑ / ↓       | 上一页 / 下一页           |
 | PageUp/Down | 上一页 / 下一页           |
 | ← / →       | 当前页内左右移动选择候选   |
 

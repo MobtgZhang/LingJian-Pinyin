@@ -16,6 +16,11 @@ SentenceDecoder::SentenceDecoder(std::shared_ptr<Dictionary> dict,
     : dict_(std::move(dict)), lm_(std::move(lm)),
       segmenter_(std::move(segmenter)) {}
 
+namespace {
+constexpr std::size_t kMaxEntriesPerLookup = 20;
+constexpr std::size_t kMaxSpan = 3;
+}
+
 std::vector<SentencePath> SentenceDecoder::decode(
     const std::string &pinyin, int beamWidth) const {
     if (pinyin.empty() || !dict_ || !dict_->isLoaded()) return {};
@@ -39,6 +44,7 @@ std::vector<SentencePath> SentenceDecoder::decode(
 
         int processed = 0;
         std::vector<Node> currentNodes;
+        currentNodes.reserve(beamWidth);
         while (!beam.empty() && processed < beamWidth) {
             currentNodes.push_back(beam.top());
             beam.pop();
@@ -51,22 +57,16 @@ std::vector<SentencePath> SentenceDecoder::decode(
                 continue;
             }
 
+            std::unordered_set<std::string> seenWords;
             for (std::size_t span = 1;
-                 span <= syllables.size() - step && span <= 4; ++span) {
-                std::string combinedPinyin;
-                for (std::size_t k = 0; k < span; ++k) {
-                    if (k > 0) combinedPinyin += "'";
-                    combinedPinyin += syllables[step + k];
-                }
-
+                 span <= syllables.size() - step && span <= kMaxSpan; ++span) {
                 std::string flatPinyin;
                 for (std::size_t k = 0; k < span; ++k) {
                     flatPinyin += syllables[step + k];
                 }
 
-                std::unordered_set<std::string> seenWords;
                 auto tryEntries = [&](const std::string &py) {
-                    auto entries = dict_->lookup(py);
+                    auto entries = dict_->lookup(py, kMaxEntriesPerLookup);
                     for (const auto &e : entries) {
                         if (!seenWords.insert(e.text).second) continue;
 
@@ -85,37 +85,22 @@ std::vector<SentencePath> SentenceDecoder::decode(
                     }
                 };
 
-                tryEntries(combinedPinyin);
-                if (flatPinyin != combinedPinyin) {
-                    tryEntries(flatPinyin);
-                }
-
-                if (span == 1) {
-                    auto prefixEntries = dict_->lookupPrefix(syllables[step]);
-                    for (const auto &e : prefixEntries) {
-                        if (e.pinyin != syllables[step]) continue;
-                        if (!seenWords.insert(e.text).second) continue;
-
-                        float wordScore = lm_->unigramScore(e.text);
-                        if (!node.words.empty()) {
-                            wordScore = lm_->bigramScore(
-                                node.words.back(), e.text);
-                        }
-
-                        Node next;
-                        next.words = node.words;
-                        next.words.push_back(e.text);
-                        next.pinyinPos = step + 1;
-                        next.score = node.score + wordScore;
-                        nextBeam.push(next);
+                tryEntries(flatPinyin);
+                if (span > 1) {
+                    std::string combinedPinyin;
+                    for (std::size_t k = 0; k < span; ++k) {
+                        if (k > 0) combinedPinyin += "'";
+                        combinedPinyin += syllables[step + k];
                     }
+                    if (combinedPinyin != flatPinyin) tryEntries(combinedPinyin);
                 }
             }
         }
 
         beam = BeamQueue{};
         int kept = 0;
-        while (!nextBeam.empty() && kept < beamWidth * 2) {
+        const int maxKept = beamWidth;
+        while (!nextBeam.empty() && kept < maxKept) {
             beam.push(nextBeam.top());
             nextBeam.pop();
             ++kept;
@@ -145,10 +130,8 @@ std::vector<SentencePath> SentenceDecoder::decode(
                   return a.score > b.score;
               });
 
-    constexpr std::size_t kMaxResults = 50;
-    if (results.size() > kMaxResults) {
-        results.resize(kMaxResults);
-    }
+    constexpr std::size_t kMaxResults = 20;
+    if (results.size() > kMaxResults) results.resize(kMaxResults);
 
     return results;
 }

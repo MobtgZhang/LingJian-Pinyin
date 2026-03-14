@@ -52,8 +52,10 @@ public:
     int pageSize() const { return pageSize_; }
     std::vector<CoreCandidate> currentPageCandidates() const;
 
-private:
+    /** 刷新候选列表（解码），由 UI 在防抖后或需要时调用 */
     void updateCandidates();
+
+private:
 
     std::shared_ptr<Dictionary> dict_;
     std::unique_ptr<Decoder> decoder_;

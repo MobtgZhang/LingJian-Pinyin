@@ -1,4 +1,5 @@
 #include "status_bar_menu.h"
+#include "status_bar.h"
 #include "help_submenu.h"
 #include "theme_manager.h"
 
@@ -89,7 +90,21 @@ void StatusBarMenu::buildLayout() {
                  contentHeight_ + 2 * kShadowMargin);
 }
 
+void StatusBarMenu::updateTogglesFromStatusBar(StatusBar *bar) {
+    if (!bar || toggles_.size() < 4) return;
+    toggles_[0].character = (bar->simplifiedTraditional() == StatusBar::SimplifiedTraditional::Simplified)
+        ? QStringLiteral("\u7b80") : QStringLiteral("\u7e41");
+    toggles_[1].character = (bar->halfFullWidth() == StatusBar::HalfFullWidth::Full)
+        ? QStringLiteral("\u5168") : QStringLiteral("\u534a");
+    toggles_[2].character = (bar->inputMode() == StatusBar::InputMode::Chinese)
+        ? QStringLiteral("\u4e2d") : QStringLiteral("\u82f1");
+    toggles_[3].character = QStringLiteral("\U0001F441");
+}
+
 void StatusBarMenu::popup(const QPoint &pos) {
+    StatusBar *bar = qobject_cast<StatusBar *>(parent());
+    if (bar) updateTogglesFromStatusBar(bar);
+
     QScreen *screen = QApplication::screenAt(pos);
     if (!screen) screen = QApplication::primaryScreen();
 

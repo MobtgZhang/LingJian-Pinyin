@@ -19,56 +19,105 @@ Decoder::Decoder(std::shared_ptr<Dictionary> dict)
 
 Decoder::~Decoder() = default;
 
+void Decoder::warmup() {
+    if (lm_) lm_->ensureWordFreqCache();
+}
+
+std::vector<CoreCandidate> Decoder::decode(const std::string &pinyin) const {
+    if (pinyin.empty() || !dict_ || !dict_->isLoaded()) {
+        return {};
+    }
+    auto it = decodeCache_.find(pinyin);
+    if (it != decodeCache_.end()) {
+        decodeCacheOrder_.remove(pinyin);
+        decodeCacheOrder_.push_back(pinyin);
+        return it->second;
+    }
+    auto result = decodeImpl(pinyin);
+    if (decodeCache_.size() >= kDecodeCacheMaxSize && !decodeCacheOrder_.empty()) {
+        auto oldest = decodeCacheOrder_.front();
+        decodeCacheOrder_.pop_front();
+        decodeCache_.erase(oldest);
+    }
+    decodeCacheOrder_.push_back(pinyin);
+    decodeCache_[pinyin] = result;
+    return result;
+}
+
 /*
  * 解码流水线:
  *   拼音输入 → 拼音切分 → 拼音→汉字候选 → 语言模型评分
  *           → Beam Search → 输出候选句
  *
- * 1) 先用 SentenceDecoder 做整句解码（Beam Search）
- * 2) 再补充单音节精确匹配和前缀匹配的单字/单词候选
+ * 1) 整词/整句匹配（你好、你好我的宝宝 等）
+ * 2) 补充每个音节的单字候选，支持逐字选择（选"你"再选"好"）
  * 3) 合并去重，保证最优结果在前
  */
-std::vector<CoreCandidate> Decoder::decode(const std::string &pinyin) const {
-    if (pinyin.empty() || !dict_ || !dict_->isLoaded()) {
-        return {};
-    }
-
+std::vector<CoreCandidate> Decoder::decodeImpl(const std::string &pinyin) const {
     std::vector<CoreCandidate> result;
     std::unordered_set<std::string> seen;
 
-    // 阶段1: 整句 Beam Search 解码
-    auto sentenceCandidates = sentenceDecoder_->decodeToCandidates(pinyin, 10);
-    for (auto &c : sentenceCandidates) {
-        if (seen.insert(c.text).second) {
-            result.push_back(std::move(c));
+    auto addCandidate = [&](const std::string &text, const std::string &comment) {
+        if (seen.insert(text).second) result.push_back({text, comment});
+    };
+
+    // 切分拼音为音节，用于补充单字候选
+    auto seg = segmenter_->bestSegment(pinyin);
+    const auto &syllables = seg.syllables;
+
+    // 短输入快速路径
+    constexpr std::size_t kFastPathMaxLen = 10;
+    if (pinyin.size() <= kFastPathMaxLen) {
+        // 1) 整词精确匹配 + 前缀匹配
+        auto exact = dict_->lookup(pinyin, 50);
+        for (const auto &e : exact) addCandidate(e.text, e.pinyin);
+        auto prefix = dict_->lookupPrefix(pinyin, 30);
+        for (const auto &e : prefix) addCandidate(e.text, e.pinyin);
+
+        // 2) 每个音节的单字候选，支持逐字选择（如 nihao -> 你/尼/好/号）
+        constexpr std::size_t kCharsPerSyllable = 12;
+        for (const auto &syl : syllables) {
+            auto sylEntries = dict_->lookup(syl, kCharsPerSyllable);
+            for (const auto &e : sylEntries) addCandidate(e.text, e.pinyin);
         }
+
+        if (result.size() > 80) result.resize(80);
+        return result;
     }
 
-    // 阶段2: 传统单音节精确匹配（兜底）
+    // 长输入：整句 Beam Search + 单字补充
+    constexpr int kBeamWidth = 4;
+    auto sentenceCandidates =
+        sentenceDecoder_->decodeToCandidates(pinyin, kBeamWidth);
+    for (auto &c : sentenceCandidates) addCandidate(c.text, c.comment);
+
     auto exact = dict_->lookup(pinyin);
-    for (const auto &e : exact) {
-        if (seen.insert(e.text).second) {
-            result.push_back({e.text, e.pinyin});
-        }
+    for (const auto &e : exact) addCandidate(e.text, e.pinyin);
+
+    auto prefix = dict_->lookupPrefix(pinyin, 50);
+    for (const auto &e : prefix) addCandidate(e.text, e.pinyin);
+
+    // 每个音节的单字候选
+    constexpr std::size_t kCharsPerSyllable = 10;
+    for (const auto &syl : syllables) {
+        auto sylEntries = dict_->lookup(syl, kCharsPerSyllable);
+        for (const auto &e : sylEntries) addCandidate(e.text, e.pinyin);
     }
 
-    // 阶段3: 前缀匹配补充
-    auto prefix = dict_->lookupPrefix(pinyin);
-    for (const auto &e : prefix) {
-        if (seen.insert(e.text).second) {
-            result.push_back({e.text, e.pinyin});
-        }
-    }
-
-    constexpr std::size_t kMaxCandidates = 100;
-    if (result.size() > kMaxCandidates) {
-        result.resize(kMaxCandidates);
-    }
+    constexpr std::size_t kMaxCandidates = 120;
+    if (result.size() > kMaxCandidates) result.resize(kMaxCandidates);
 
     return result;
 }
 
 std::string Decoder::segmentedPinyin(const std::string &pinyin) const {
+    if (pinyin.empty()) return {};
+    auto it = segmentCache_.find(pinyin);
+    if (it != segmentCache_.end()) {
+        segmentCacheOrder_.remove(pinyin);
+        segmentCacheOrder_.push_back(pinyin);
+        return it->second;
+    }
     auto seg = segmenter_->bestSegment(pinyin);
     std::string result;
     for (std::size_t i = 0; i < seg.syllables.size(); ++i) {
@@ -79,6 +128,13 @@ std::string Decoder::segmentedPinyin(const std::string &pinyin) const {
         if (!result.empty()) result += "'";
         result += seg.remainder;
     }
+    if (segmentCache_.size() >= kSegmentCacheMaxSize && !segmentCacheOrder_.empty()) {
+        auto oldest = segmentCacheOrder_.front();
+        segmentCacheOrder_.pop_front();
+        segmentCache_.erase(oldest);
+    }
+    segmentCacheOrder_.push_back(pinyin);
+    segmentCache_[pinyin] = result;
     return result;
 }
 

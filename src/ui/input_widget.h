@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QTextEdit>
+#include <QTimer>
 #include <memory>
 
 namespace core {
@@ -22,6 +23,12 @@ public:
     bool isChineseMode() const { return chineseMode_; }
     void setChineseMode(bool on);
 
+    void setSimplifiedTraditional(bool traditional);
+    void setHalfFullWidth(bool fullWidth);
+
+    /** 插入已确认的文本（会应用简繁、全半角转换） */
+    void insertCommittedText(const QString &text);
+
 signals:
     void chineseModeChanged(bool on);
 
@@ -32,9 +39,15 @@ private:
     void commitText(const QString &text);
     void updateCandidateView();
     void positionCandidateView();
+    void scheduleDecode();
+    void flushDecode();
 
     std::shared_ptr<core::InputContext> ctx_;
     CandidateView *candidateView_ = nullptr;
     StatusBar *statusBar_ = nullptr;
     bool chineseMode_ = true;
+    bool traditionalMode_ = false;
+    bool fullWidthMode_ = true;
+    QTimer decodeDebounceTimer_;
+    static constexpr int kDebounceMs = 35;
 };

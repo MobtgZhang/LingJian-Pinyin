@@ -13,6 +13,7 @@ CandidateView::CandidateView(QWidget *parent)
 }
 
 void CandidateView::setCandidates(const QStringList &candidates) {
+    if (candidates_ == candidates) return;
     candidates_ = candidates;
     rebuildLayout();
     updateGeometry();
@@ -21,6 +22,7 @@ void CandidateView::setCandidates(const QStringList &candidates) {
 }
 
 void CandidateView::setPreeditText(const QString &text) {
+    if (preeditText_ == text) return;
     preeditText_ = text;
     rebuildLayout();
     updateGeometry();
@@ -29,6 +31,7 @@ void CandidateView::setPreeditText(const QString &text) {
 }
 
 void CandidateView::setPageInfo(int current, int total) {
+    if (currentPage_ == current && totalPages_ == total) return;
     currentPage_ = current;
     totalPages_ = total;
     update();
@@ -88,8 +91,10 @@ void CandidateView::rebuildLayout() {
 }
 
 QSize CandidateView::sizeHint() const {
+    int minW = 200;
+    int minH = kPreeditHeight + kHeight;
     if (candidates_.isEmpty() && preeditText_.isEmpty()) {
-        return {200, kPreeditHeight + kHeight};
+        return {minW, minH};
     }
 
     double right = kPadding;
@@ -104,9 +109,9 @@ QSize CandidateView::sizeHint() const {
     int preeditWidth = pfm.horizontalAdvance(preeditText_) + kPadding * 2;
 
     int w = std::max(static_cast<int>(right) + kPadding, preeditWidth);
-    w = std::max(w, 150);
+    w = std::max(w, minW);
 
-    return {w, kPreeditHeight + kHeight};
+    return {w, minH};
 }
 
 int CandidateView::hitTestCandidate(const QPoint &pos) const {

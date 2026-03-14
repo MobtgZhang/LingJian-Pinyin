@@ -9,19 +9,24 @@ namespace core {
 LanguageModel::LanguageModel(std::shared_ptr<Dictionary> dict)
     : dict_(std::move(dict)) {}
 
-float LanguageModel::unigramScore(const std::string &word) const {
-    if (!dict_ || !dict_->isLoaded()) return defaultScore_;
-
-    float maxFreq = 0.0f;
-    auto entries = dict_->allEntries();
+void LanguageModel::ensureWordFreqCache() const {
+    if (!dict_ || !dict_->isLoaded() || !wordFreqCache_.empty()) return;
+    const auto &entries = dict_->allEntries();
+    wordFreqCache_.reserve(std::min(entries.size(), std::size_t(500000)));
     for (const auto &e : entries) {
-        if (e.text == word) {
-            maxFreq = std::max(maxFreq, e.freq);
+        auto it = wordFreqCache_.find(e.text);
+        if (it == wordFreqCache_.end() || e.freq > it->second) {
+            wordFreqCache_[e.text] = e.freq;
         }
     }
+}
 
-    if (maxFreq <= 0.0f) return defaultScore_;
-    return std::log10(maxFreq + 1.0f);
+float LanguageModel::unigramScore(const std::string &word) const {
+    if (!dict_ || !dict_->isLoaded()) return defaultScore_;
+    ensureWordFreqCache();
+    auto it = wordFreqCache_.find(word);
+    if (it == wordFreqCache_.end() || it->second <= 0.0f) return defaultScore_;
+    return std::log10(it->second + 1.0f);
 }
 
 float LanguageModel::bigramScore(const std::string &prev,

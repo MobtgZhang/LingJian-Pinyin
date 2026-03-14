@@ -7,6 +7,7 @@
 #include <QTimer>
 
 class HelpSubmenu;
+class StatusBar;
 
 class StatusBarMenu : public QWidget {
     Q_OBJECT
@@ -14,6 +15,7 @@ public:
     explicit StatusBarMenu(QWidget *parent = nullptr);
 
     void popup(const QPoint &pos);
+    void updateTogglesFromStatusBar(StatusBar *bar);
 
 signals:
     void simplifiedTraditionalToggled();

@@ -30,6 +30,7 @@ target_link_libraries(lingjian_ui
     PRIVATE
         Qt6::Widgets
         lingjian_core
+        lingjian_utils
 )
 
 target_include_directories(lingjian_ui

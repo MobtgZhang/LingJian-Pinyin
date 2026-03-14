@@ -16,9 +16,11 @@ bool Dictionary::loadFromFile(const std::string &path) {
     }
 
     exactMap_.clear();
+    sortedPinyinKeys_.clear();
     allEntries_.clear();
 
     std::string line;
+    allEntries_.reserve(1000000);
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') {
             continue;
@@ -45,32 +47,53 @@ bool Dictionary::loadFromFile(const std::string &path) {
                   });
     }
 
+    sortedPinyinKeys_.reserve(exactMap_.size());
+    for (const auto &[key, _] : exactMap_) {
+        sortedPinyinKeys_.push_back(key);
+    }
+    std::sort(sortedPinyinKeys_.begin(), sortedPinyinKeys_.end());
+
     loaded_ = true;
     return true;
 }
 
-std::vector<DictEntry> Dictionary::lookup(const std::string &pinyin) const {
+std::vector<DictEntry> Dictionary::lookup(const std::string &pinyin,
+                                          std::size_t maxResults) const {
     auto it = exactMap_.find(pinyin);
-    if (it != exactMap_.end()) {
-        return it->second;
-    }
-    return {};
+    if (it == exactMap_.end()) return {};
+    const auto &entries = it->second;
+    if (entries.size() <= maxResults) return entries;
+    return std::vector<DictEntry>(entries.begin(),
+                                  entries.begin() + maxResults);
 }
 
-std::vector<DictEntry> Dictionary::lookupPrefix(const std::string &prefix) const {
+std::vector<DictEntry> Dictionary::lookupPrefix(const std::string &prefix,
+                                                 std::size_t maxResults) const {
     if (prefix.empty()) {
         return {};
     }
 
+    auto it = std::lower_bound(sortedPinyinKeys_.begin(),
+                                sortedPinyinKeys_.end(), prefix);
     std::vector<DictEntry> result;
-    for (const auto &[key, entries] : exactMap_) {
-        if (key.size() >= prefix.size() &&
-            key.compare(0, prefix.size(), prefix) == 0) {
-            for (const auto &e : entries) {
-                result.push_back(e);
-            }
+    result.reserve(std::min(maxResults, std::size_t(100)));
+
+    constexpr std::size_t kMaxKeysToScan = 150;
+    std::size_t keysScanned = 0;
+
+    for (; it != sortedPinyinKeys_.end() && keysScanned < kMaxKeysToScan; ++it, ++keysScanned) {
+        if (it->size() < prefix.size() ||
+            it->compare(0, prefix.size(), prefix) != 0) {
+            break;
         }
+        const auto &entries = exactMap_.find(*it)->second;
+        for (const auto &e : entries) {
+            result.push_back(e);
+            if (result.size() >= maxResults) break;
+        }
+        if (result.size() >= maxResults) break;
     }
+    if (result.empty()) return result;
 
     std::sort(result.begin(), result.end(),
               [&prefix](const DictEntry &a, const DictEntry &b) {

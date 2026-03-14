@@ -21,9 +21,12 @@ public:
 
     void addBigram(const std::string &prev, const std::string &current, float score);
 
+    void ensureWordFreqCache() const;
+
 private:
     std::shared_ptr<Dictionary> dict_;
     std::unordered_map<std::string, float> bigramScores_;
+    mutable std::unordered_map<std::string, float> wordFreqCache_;
     float defaultScore_ = -10.0f;
 };
 

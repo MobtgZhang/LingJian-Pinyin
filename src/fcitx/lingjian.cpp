@@ -60,6 +60,7 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
     if (key.check(FcitxKey_BackSpace)) {
         if (ctx_.isComposing()) {
             ctx_.handleBackspace();
+            if (ctx_.isComposing()) ctx_.updateCandidates();
             updateUI();
             event.filterAndAccept();
         }
@@ -114,7 +115,8 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
         return;
     }
 
-    if (key.check(FcitxKey_minus) || key.check(FcitxKey_Page_Up)) {
+    if (key.check(FcitxKey_minus) || key.check(FcitxKey_Up) ||
+        key.check(FcitxKey_Page_Up)) {
         if (ctx_.isComposing()) {
             handlePageNavigation(true);
             event.filterAndAccept();
@@ -122,7 +124,8 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
         return;
     }
 
-    if (key.check(FcitxKey_equal) || key.check(FcitxKey_Page_Down)) {
+    if (key.check(FcitxKey_equal) || key.check(FcitxKey_Down) ||
+        key.check(FcitxKey_Page_Down)) {
         if (ctx_.isComposing()) {
             handlePageNavigation(false);
             event.filterAndAccept();
@@ -163,6 +166,7 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
     if (sym >= FcitxKey_a && sym <= FcitxKey_z && key.check(sym)) {
         char ch = static_cast<char>(sym - FcitxKey_a + 'a');
         ctx_.handleKey(ch);
+        ctx_.updateCandidates();
         updateUI();
         event.filterAndAccept();
         return;
@@ -173,6 +177,7 @@ void LingJianState::keyEvent(fcitx::KeyEvent &event) {
         key.check(sym, fcitx::KeyState::Shift)) {
         char ch = static_cast<char>(sym - FcitxKey_A + 'a');
         ctx_.handleKey(ch);
+        ctx_.updateCandidates();
         updateUI();
         event.filterAndAccept();
         return;

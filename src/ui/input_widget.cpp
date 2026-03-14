@@ -1,6 +1,7 @@
 #include "input_widget.h"
 #include "candidate_view.h"
 #include "status_bar.h"
+#include "sc_tc_converter.h"
 
 #include <QKeyEvent>
 #include <QScrollBar>
@@ -11,6 +12,13 @@ InputWidget::InputWidget(QWidget *parent)
     setPlaceholderText(QStringLiteral("在此输入文字..."));
     setFont(QFont(QStringLiteral("Noto Sans CJK SC,Microsoft YaHei,SimSun"), 14));
     setMinimumSize(500, 300);
+    decodeDebounceTimer_.setSingleShot(true);
+    connect(&decodeDebounceTimer_, &QTimer::timeout, this, [this]() {
+        if (ctx_ && ctx_->isComposing()) {
+            ctx_->updateCandidates();
+            updateCandidateView();
+        }
+    });
 }
 
 InputWidget::~InputWidget() = default;
@@ -25,6 +33,18 @@ void InputWidget::setCandidateView(CandidateView *view) {
 
 void InputWidget::setStatusBar(StatusBar *bar) {
     statusBar_ = bar;
+}
+
+void InputWidget::setSimplifiedTraditional(bool traditional) {
+    traditionalMode_ = traditional;
+}
+
+void InputWidget::setHalfFullWidth(bool fullWidth) {
+    fullWidthMode_ = fullWidth;
+}
+
+void InputWidget::insertCommittedText(const QString &text) {
+    commitText(text);
 }
 
 void InputWidget::setChineseMode(bool on) {
@@ -52,6 +72,11 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
             QTextEdit::keyPressEvent(event);
             return;
         }
+        if (r == core::InputContext::KeyResult::Committed) {
+            commitText(QString::fromStdString(ctx_->committedText()));
+            ctx_->clearCommitted();
+        }
+        scheduleDecode();
         updateCandidateView();
         return;
     }
@@ -80,6 +105,7 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
 
     if (key == Qt::Key_Space && ctx_->isComposing()) {
         int globalIdx = ctx_->currentPage() * ctx_->pageSize() + ctx_->currentCursorIndex();
+        flushDecode();
         auto r = ctx_->selectCandidate(static_cast<std::size_t>(globalIdx));
         if (r == core::InputContext::KeyResult::Committed) {
             commitText(QString::fromStdString(ctx_->committedText()));
@@ -90,6 +116,7 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
     }
 
     if (ctx_->isComposing() && key >= Qt::Key_1 && key <= Qt::Key_9) {
+        flushDecode();
         char ch = '1' + (key - Qt::Key_1);
         auto r = ctx_->handleKey(ch);
         if (r == core::InputContext::KeyResult::Committed) {
@@ -100,7 +127,7 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
         return;
     }
 
-    if (key == Qt::Key_Minus || key == Qt::Key_PageUp) {
+    if (key == Qt::Key_Minus || key == Qt::Key_Up || key == Qt::Key_PageUp) {
         if (ctx_->isComposing()) {
             ctx_->handlePageUp();
             updateCandidateView();
@@ -108,7 +135,7 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
         }
     }
 
-    if (key == Qt::Key_Equal || key == Qt::Key_PageDown) {
+    if (key == Qt::Key_Equal || key == Qt::Key_Down || key == Qt::Key_PageDown) {
         if (ctx_->isComposing()) {
             ctx_->handlePageDown();
             updateCandidateView();
@@ -137,6 +164,7 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
         if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
             auto r = ctx_->handleKey(ch);
             if (r == core::InputContext::KeyResult::Consumed) {
+                scheduleDecode();
                 updateCandidateView();
                 return;
             }
@@ -150,7 +178,29 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
 
 void InputWidget::commitText(const QString &text) {
     if (text.isEmpty()) return;
-    textCursor().insertText(text);
+    QString result = text;
+    if (traditionalMode_ && chineseMode_) {
+        lingjian::ScTcConverter conv;
+        if (conv.isAvailable()) {
+            result = QString::fromStdString(conv.toTraditional(text.toStdString()));
+        }
+    }
+    if (!fullWidthMode_) {
+        result = result.replace(QChar(0xFF01), QChar(0x0021))
+            .replace(QChar(0xFF0C), QChar(0x002C))
+            .replace(QChar(0xFF1A), QChar(0x003A))
+            .replace(QChar(0xFF1B), QChar(0x003B))
+            .replace(QChar(0xFF1F), QChar(0x003F))
+            .replace(QChar(0xFF08), QChar(0x0028))
+            .replace(QChar(0xFF09), QChar(0x0029))
+            .replace(QChar(0x3001), QChar(0x002C))
+            .replace(QChar(0x3002), QChar(0x002E))
+            .replace(QChar(0xFF0E), QChar(0x002E))
+            .replace(QChar(0x3000), QChar(0x0020));
+        for (ushort i = 0; i <= 9; ++i)
+            result = result.replace(QChar(0xFF10 + i), QChar(0x0030 + i));
+    }
+    textCursor().insertText(result);
 }
 
 void InputWidget::updateCandidateView() {
@@ -165,8 +215,14 @@ void InputWidget::updateCandidateView() {
     auto pageCandidates = ctx_->currentPageCandidates();
 
     QStringList items;
+    lingjian::ScTcConverter conv;
+    const bool needTraditional = traditionalMode_ && chineseMode_ && conv.isAvailable();
     for (const auto &c : pageCandidates) {
-        items << QString::fromStdString(c.text);
+        QString text = QString::fromStdString(c.text);
+        if (needTraditional) {
+            text = QString::fromStdString(conv.toTraditional(c.text));
+        }
+        items << text;
     }
 
     candidateView_->setPreeditText(preedit);
@@ -175,7 +231,9 @@ void InputWidget::updateCandidateView() {
     candidateView_->setHighlightedIndex(ctx_->currentCursorIndex());
 
     positionCandidateView();
-    candidateView_->show();
+    if (!candidateView_->isVisible()) {
+        candidateView_->show();
+    }
     candidateView_->raise();
 }
 
@@ -187,4 +245,18 @@ void InputWidget::positionCandidateView() {
     globalPos.setY(globalPos.y() + 4);
     candidateView_->move(globalPos);
     candidateView_->adjustSize();
+}
+
+void InputWidget::scheduleDecode() {
+    decodeDebounceTimer_.stop();
+    if (ctx_ && ctx_->isComposing()) {
+        decodeDebounceTimer_.start(kDebounceMs);
+    }
+}
+
+void InputWidget::flushDecode() {
+    decodeDebounceTimer_.stop();
+    if (ctx_ && ctx_->isComposing()) {
+        ctx_->updateCandidates();
+    }
 }

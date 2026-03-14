@@ -19,6 +19,8 @@ public:
 
     enum class InputMode { Chinese, English };
     enum class PunctuationMode { Chinese, English };
+    enum class SimplifiedTraditional { Simplified, Traditional };
+    enum class HalfFullWidth { Half, Full };
 
     void setInputMode(InputMode mode);
     InputMode inputMode() const { return inputMode_; }
@@ -26,14 +28,27 @@ public:
     void setPunctuationMode(PunctuationMode mode);
     PunctuationMode punctuationMode() const { return punctuationMode_; }
 
+    void setSimplifiedTraditional(SimplifiedTraditional mode);
+    SimplifiedTraditional simplifiedTraditional() const { return simplifiedTraditional_; }
+
+    void setHalfFullWidth(HalfFullWidth mode);
+    HalfFullWidth halfFullWidth() const { return halfFullWidth_; }
+
     void applySkinColors(const QColor &bg, const QColor &border,
                          const QColor &text, const QColor &hover,
                          const QColor &logo, const QColor &ai,
                          int borderRadius);
 
+    void showContextMenuAt(const QPoint &globalPos);
+
+    /** 请求隐藏状态栏（与右键菜单「隐藏状态栏」行为一致） */
+    void requestHide();
+
 signals:
     void inputModeToggled(InputMode mode);
     void punctuationModeToggled(PunctuationMode mode);
+    void simplifiedTraditionalToggled(SimplifiedTraditional mode);
+    void halfFullWidthToggled(HalfFullWidth mode);
     void voiceInputClicked();
     void keyboardClicked();
     void skinClicked();
@@ -60,6 +75,8 @@ private:
 
     InputMode inputMode_ = InputMode::Chinese;
     PunctuationMode punctuationMode_ = PunctuationMode::Chinese;
+    SimplifiedTraditional simplifiedTraditional_ = SimplifiedTraditional::Simplified;
+    HalfFullWidth halfFullWidth_ = HalfFullWidth::Full;
 
     QColor bgColor_{255, 255, 255, 245};
     QColor borderColor_{210, 210, 210};

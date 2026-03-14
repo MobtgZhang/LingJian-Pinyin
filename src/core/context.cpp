@@ -13,18 +13,22 @@ InputContext::InputContext()
 InputContext::~InputContext() = default;
 
 bool InputContext::loadDictionary(const std::string &path) {
-    return dict_->loadFromFile(path);
+    if (!dict_->loadFromFile(path)) return false;
+    decoder_->warmup();
+    return true;
 }
 
 InputContext::KeyResult InputContext::handleKey(char ch) {
     if (ch >= 'a' && ch <= 'z') {
         composingPinyin_.push_back(ch);
-        updateCandidates();
+        currentPage_ = 0;
+        cursorIndex_ = 0;
         return KeyResult::Consumed;
     }
     if (ch >= 'A' && ch <= 'Z') {
         composingPinyin_.push_back(static_cast<char>(ch - 'A' + 'a'));
-        updateCandidates();
+        currentPage_ = 0;
+        cursorIndex_ = 0;
         return KeyResult::Consumed;
     }
 
@@ -49,8 +53,10 @@ InputContext::KeyResult InputContext::handleBackspace() {
         return KeyResult::Ignored;
     }
     composingPinyin_.pop_back();
-    updateCandidates();
+    currentPage_ = 0;
+    cursorIndex_ = 0;
     if (composingPinyin_.empty()) {
+        allCandidates_.clear();
         return KeyResult::Committed;
     }
     return KeyResult::Consumed;

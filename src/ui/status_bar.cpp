@@ -31,6 +31,20 @@ void StatusBar::setPunctuationMode(PunctuationMode mode) {
     update();
 }
 
+void StatusBar::setSimplifiedTraditional(SimplifiedTraditional mode) {
+    if (simplifiedTraditional_ == mode) return;
+    simplifiedTraditional_ = mode;
+    rebuildButtons();
+    update();
+}
+
+void StatusBar::setHalfFullWidth(HalfFullWidth mode) {
+    if (halfFullWidth_ == mode) return;
+    halfFullWidth_ = mode;
+    rebuildButtons();
+    update();
+}
+
 void StatusBar::applySkinColors(const QColor &bg, const QColor &border,
                                  const QColor &text, const QColor &hover,
                                  const QColor &logo, const QColor &ai,
@@ -50,12 +64,13 @@ void StatusBar::rebuildButtons() {
 
     QString modeLabel = (inputMode_ == InputMode::Chinese)
         ? QStringLiteral("\u4e2d") : QStringLiteral("\u82f1");
-    QString punctLabel = (punctuationMode_ == PunctuationMode::Chinese)
-        ? QStringLiteral("\uff0c") : QStringLiteral(",");
+    // 全角=○(U+25CB) 半角=◐(U+25D0)
+    QString hfLabel = (halfFullWidth_ == HalfFullWidth::Full)
+        ? QStringLiteral("\u25CB") : QStringLiteral("\u25D0");
 
     buttons_.append({QStringLiteral("\u7075"), {}, false});
     buttons_.append({modeLabel, {}, false});
-    buttons_.append({punctLabel, {}, false});
+    buttons_.append({hfLabel, {}, false});
     buttons_.append({QStringLiteral("\U0001F3A4"), {}, false});
     buttons_.append({QStringLiteral("\u2328"), {}, false});
     buttons_.append({QStringLiteral("\U0001F3A8"), {}, false});
@@ -134,7 +149,7 @@ void StatusBar::paintEvent(QPaintEvent *event) {
             drawFont.setWeight(QFont::Bold);
             break;
         case 2:
-            drawFont.setPointSize(15);
+            drawFont.setPointSize(16);
             break;
         case 3:
             drawFont.setPointSize(13);
@@ -201,7 +216,7 @@ void StatusBar::mouseMoveEvent(QMouseEvent *event) {
             static const QStringList tooltips = {
                 QStringLiteral("\u7075\u952e\u62fc\u97f3"),
                 QStringLiteral("\u4e2d/\u82f1\u6587\u5207\u6362"),
-                QStringLiteral("\u5168\u89d2/\u534a\u89d2\u7b26\u53f7"),
+                QStringLiteral("\u5168\u534a\u89d2\u5207\u6362"),
                 QStringLiteral("\u8bed\u97f3\u8f93\u5165"),
                 QStringLiteral("\u952e\u76d8\u5e03\u5c40"),
                 QStringLiteral("\u76ae\u80a4\u8bbe\u7f6e"),
@@ -240,10 +255,10 @@ void StatusBar::mouseReleaseEvent(QMouseEvent *event) {
             break;
         }
         case 2: {
-            PunctuationMode newMode = (punctuationMode_ == PunctuationMode::Chinese)
-                ? PunctuationMode::English : PunctuationMode::Chinese;
-            setPunctuationMode(newMode);
-            emit punctuationModeToggled(newMode);
+            HalfFullWidth newMode = (halfFullWidth_ == HalfFullWidth::Full)
+                ? HalfFullWidth::Half : HalfFullWidth::Full;
+            setHalfFullWidth(newMode);
+            emit halfFullWidthToggled(newMode);
             break;
         }
         case 3:
@@ -272,6 +287,20 @@ void StatusBar::ensureContextMenu() {
 
     contextMenu_ = new StatusBarMenu(this);
 
+    connect(contextMenu_, &StatusBarMenu::simplifiedTraditionalToggled, this, [this]() {
+        SimplifiedTraditional newMode = (simplifiedTraditional_ == SimplifiedTraditional::Simplified)
+            ? SimplifiedTraditional::Traditional : SimplifiedTraditional::Simplified;
+        setSimplifiedTraditional(newMode);
+        emit simplifiedTraditionalToggled(newMode);
+    });
+
+    connect(contextMenu_, &StatusBarMenu::halfFullWidthToggled, this, [this]() {
+        HalfFullWidth newMode = (halfFullWidth_ == HalfFullWidth::Full)
+            ? HalfFullWidth::Half : HalfFullWidth::Full;
+        setHalfFullWidth(newMode);
+        emit halfFullWidthToggled(newMode);
+    });
+
     connect(contextMenu_, &StatusBarMenu::chineseEnglishToggled, this, [this]() {
         InputMode newMode = (inputMode_ == InputMode::Chinese)
             ? InputMode::English : InputMode::Chinese;
@@ -297,6 +326,14 @@ void StatusBar::ensureContextMenu() {
 }
 
 void StatusBar::contextMenuEvent(QContextMenuEvent *event) {
+    showContextMenuAt(event->globalPos());
+}
+
+void StatusBar::showContextMenuAt(const QPoint &globalPos) {
     ensureContextMenu();
-    contextMenu_->popup(event->globalPos());
+    contextMenu_->popup(globalPos);
+}
+
+void StatusBar::requestHide() {
+    emit hideRequested();
 }
