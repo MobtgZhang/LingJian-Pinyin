@@ -7,6 +7,7 @@
 #include <QTimer>
 
 class HelpSubmenu;
+class MoreInputSubmenu;
 class StatusBar;
 
 class StatusBarMenu : public QWidget {
@@ -23,6 +24,7 @@ signals:
     void chineseEnglishToggled();
     void hideStatusBarClicked();
     void voiceInputClicked();
+    void handwritingInputClicked();
     void symbolsClicked();
     void softKeyboardClicked();
     void emojiClicked();
@@ -59,7 +61,8 @@ private:
     int toggleHitTest(const QPoint &pos) const;
     int itemHitTest(const QPoint &pos) const;
     void showHelpSubmenu();
-    void closeHelpSubmenuIfNeeded();
+    void showMoreInputSubmenu();
+    void closeSubmenusIfNeeded();
     void checkCursorOverMainMenu();
 
     QVector<ToggleItem> toggles_;
@@ -71,10 +74,13 @@ private:
     int contentHeight_ = 0;
 
     HelpSubmenu *helpSubmenu_ = nullptr;
+    MoreInputSubmenu *moreInputSubmenu_ = nullptr;
     QTimer hoverSubmenuTimer_;
     QTimer submenuCloseTimer_;
     QTimer checkCursorTimer_;
 
+    static constexpr int kMoreInputItemIndex = 3;
+    static constexpr int kHelpItemIndex = 5;
     static constexpr int kMenuWidth = 230;
     static constexpr int kTopSectionHeight = 88;
     static constexpr int kItemHeight = 44;

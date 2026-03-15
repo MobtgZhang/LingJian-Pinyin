@@ -312,6 +312,10 @@ void StatusBar::ensureContextMenu() {
             this, [this]() { emit hideRequested(); });
     connect(contextMenu_, &StatusBarMenu::voiceInputClicked,
             this, &StatusBar::voiceInputClicked);
+    connect(contextMenu_, &StatusBarMenu::handwritingInputClicked,
+            this, &StatusBar::handwritingInputClicked);
+    connect(contextMenu_, &StatusBarMenu::customizeStatusBarClicked,
+            this, &StatusBar::customizeStatusBarClicked);
     connect(contextMenu_, &StatusBarMenu::softKeyboardClicked,
             this, &StatusBar::keyboardClicked);
     connect(contextMenu_, &StatusBarMenu::skinStoreClicked,

@@ -24,4 +24,15 @@ if(BUILD_FCITX5)
     endif()
 endif()
 
+# 构建时把源码目录的 data/vosk-models 复制到 build/data/vosk-models，
+# 以便从 build 目录运行 lingjian_ui 或 voice_input_test 时能直接找到模型
+set(VOSK_MODELS_SRC "${CMAKE_SOURCE_DIR}/data/vosk-models")
+set(VOSK_MODELS_BUILD "${CMAKE_BINARY_DIR}/data/vosk-models")
+if(EXISTS "${VOSK_MODELS_SRC}")
+    add_custom_target(copy_vosk_models ALL
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${VOSK_MODELS_SRC}" "${VOSK_MODELS_BUILD}"
+        COMMENT "复制 Vosk 模型到 build/data/vosk-models"
+    )
+endif()
+
 add_subdirectory(src)

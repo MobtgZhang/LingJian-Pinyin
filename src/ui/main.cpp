@@ -22,6 +22,9 @@
 #include "skin_selector.h"
 #include "soft_keyboard.h"
 #include "about_dialog.h"
+#include "voice_input_dialog.h"
+#include "vosk_speech_engine.h"
+#include "themed_message_box.h"
 
 #include <context.h>
 
@@ -214,7 +217,7 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(softKeyboard, &SoftKeyboard::keyPressed,
                      inputWidget, [inputWidget](const QString &text) {
-        inputWidget->insertPlainText(text);
+        inputWidget->insertTextWithConversion(text);
     });
 
     QObject::connect(softKeyboard, &SoftKeyboard::specialKeyPressed,
@@ -297,6 +300,51 @@ int main(int argc, char *argv[]) {
         applySkinToUI(&statusBar, &candidateView, softKeyboard);
     });
 
+    // 语音输入
+    auto *voiceDialog = new VoiceInputDialog(&mainWin);
+    auto *voiceEngine = new VoskSpeechEngine(&mainWin);
+
+    QObject::connect(&statusBar, &StatusBar::voiceInputClicked, &mainWin, [&]() {
+        QPoint popupPos = statusBar.mapToGlobal(QPoint(statusBar.width() / 2, 0));
+        voiceDialog->popup(popupPos);
+    });
+
+    QObject::connect(voiceDialog, &VoiceInputDialog::startRecordingRequested,
+                     &mainWin, [voiceEngine, voiceDialog]() {
+        voiceEngine->setLanguage(voiceDialog->language() == VoiceInputDialog::Language::Mandarin
+            ? VoskSpeechEngine::Language::Mandarin : VoskSpeechEngine::Language::English);
+        voiceEngine->setAudioDevice(voiceDialog->selectedDeviceId());
+        voiceEngine->start();  // 异步加载模型，结果通过 startFinished 通知
+    });
+
+    QObject::connect(voiceEngine, &VoskSpeechEngine::startFinished,
+                     &mainWin, [voiceDialog](bool success) {
+        if (!success && voiceDialog) voiceDialog->setRecordingState(false);
+    });
+
+    QObject::connect(voiceDialog, &VoiceInputDialog::stopRecordingRequested,
+                     voiceEngine, &VoskSpeechEngine::stop);
+
+    QObject::connect(voiceEngine, &VoskSpeechEngine::finalResult,
+                     voiceDialog, &VoiceInputDialog::onTextRecognized);
+
+    QObject::connect(voiceDialog, &VoiceInputDialog::textRecognized,
+                     inputWidget, &InputWidget::insertCommittedText);
+
+    QObject::connect(voiceEngine, &VoskSpeechEngine::errorOccurred,
+                     &mainWin, [&mainWin, voiceDialog](const QString &msg) {
+        if (voiceDialog) voiceDialog->setRecordingState(false);
+        ThemedMessageBox::warning(&mainWin, QStringLiteral("语音识别"), msg, voiceDialog);
+    });
+
+    // 关闭语音输入对话框时停止录音并重置状态
+    QObject::connect(voiceDialog, &VoiceInputDialog::closed, &mainWin, [voiceEngine, voiceDialog]() {
+        if (voiceEngine->isRecording()) {
+            voiceEngine->stop();
+        }
+        voiceDialog->setRecordingState(false);
+    });
+
     // 托盘右键菜单：使用原生 QMenu，避免自定义弹窗导致的双框、闪退问题
     QMenu *trayContextMenu = new QMenu(&mainWin);
     QAction *actToggleBar = trayContextMenu->addAction(QStringLiteral("隐藏状态栏"));
@@ -305,7 +353,6 @@ int main(int argc, char *argv[]) {
     QAction *actHalfFull = trayContextMenu->addAction(QStringLiteral("全/半角切换"));
     trayContextMenu->addSeparator();
     QAction *actKeyboard = trayContextMenu->addAction(QStringLiteral("软键盘"));
-    QAction *actSkin = trayContextMenu->addAction(QStringLiteral("皮肤商城"));
     trayContextMenu->addSeparator();
     QAction *actAbout = trayContextMenu->addAction(QStringLiteral("关于灵键"));
 
@@ -354,9 +401,6 @@ int main(int argc, char *argv[]) {
         } else {
             softKeyboard->popup(QCursor::pos());
         }
-    });
-    QObject::connect(actSkin, &QAction::triggered, &mainWin, [&]() {
-        skinSelector->popup(QCursor::pos());
     });
     QObject::connect(actAbout, &QAction::triggered, &mainWin, [&]() {
         AboutDialog *about = new AboutDialog(&mainWin);

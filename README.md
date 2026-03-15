@@ -13,6 +13,7 @@
 - **皮肤滑动选择器**：点击皮肤按钮弹出滑动窗口，可视化预览并选择 8 种内置皮肤
 - **自定义皮肤**：支持从 ZIP 文件加载皮肤，兼容搜狗皮肤格式（skin.ini + 图片资源）
 - **词典支持**：基于 [rime-ice 雾凇拼音](https://github.com/iDvel/rime-ice) 词库，约 88 万+ 词条，覆盖常用汉字和词组
+- **语音输入**：基于 [Vosk](https://github.com/alphacep/vosk-api) 离线语音识别，支持普通话和英语，点击麦克风按钮或按 F2 开始说话
 
 ## 输入法架构
 
@@ -45,8 +46,11 @@ Beam Search (SentenceDecoder)
   - `input_widget.cpp/h`：输入框
   - `status_bar.cpp/h`：状态栏
   - `skin_selector.cpp/h`：皮肤滑动选择窗口
+  - `voice_input_dialog.cpp/h`：语音输入弹窗
   - `theme_manager.cpp/h`：主题管理
   - `skin_loader.cpp/h`：皮肤加载器
+- `src/voice/`：语音识别模块
+  - `vosk_speech_engine.cpp/h`：Vosk 离线语音识别封装
 - `src/dict/`：系统词典、用户词典实现
 - `src/utils/`：工具函数
 - `data/`：拼音词典数据、皮肤资源文件
@@ -68,9 +72,11 @@ python3 scripts/update_dict_from_rime.py
 
 ```bash
 # Ubuntu / Debian
-sudo apt install build-essential cmake g++ qt6-base-dev libgl1-mesa-dev \
+sudo apt install build-essential cmake g++ qt6-base-dev qt6-multimedia-dev libgl1-mesa-dev \
     fcitx5 libfcitx5core-dev libfcitx5utils-dev fcitx5-modules-dev
 ```
+
+语音输入需要 Qt6 Multimedia（麦克风采集）和可选的 libvosk（离线语音识别）。
 
 ### 构建 Fcitx5 输入法 addon
 
@@ -125,6 +131,36 @@ sudo dpkg -i lingjian-pinyin_0.1.0_amd64.deb
 | ↑ / ↓       | 上一页 / 下一页           |
 | PageUp/Down | 上一页 / 下一页           |
 | ← / →       | 当前页内左右移动选择候选   |
+| F2          | 打开语音输入 / 开始说话    |
+
+### 语音输入
+
+点击状态栏的「🎤」按钮或按 F2 打开语音输入弹窗。弹窗包含：
+
+- **语言选择**：普通话 / 英语
+- **输入设备**：选择麦克风设备
+- **麦克风按钮**：点击开始说话，再次点击结束并识别
+
+语音识别基于 [Vosk](https://github.com/alphacep/vosk-api) 离线引擎。使用前需：
+
+1. **安装 libvosk**（可选，未安装时点击会提示）：
+   - **Ubuntu 24.04**：官方仓库暂无 libvosk 包，请用预编译库安装：
+     ```bash
+     cd /tmp
+     wget https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-linux-x86_64-0.3.45.zip
+     unzip vosk-linux-x86_64-0.3.45.zip
+     # 解压后可能是当前目录下的 libvosk.so，或子目录（如 vosk-linux-x86_64-0.3.45/libvosk.so）
+     sudo cp libvosk.so /usr/local/lib/ 2>/dev/null || sudo cp vosk-linux-x86_64-0.3.45/libvosk.so /usr/local/lib/
+     sudo ldconfig
+     ```
+     若不想动系统目录，可解压到任意目录（如 `$HOME/.local/lib/vosk`），然后运行程序前执行：  
+     `export VOSK_LIB_PATH=$HOME/.local/lib/vosk`
+   - 若 libvosk 已在自定义目录，可设置环境变量 **`VOSK_LIB_PATH`**：  
+     - 指向目录：`export VOSK_LIB_PATH=/path/to/dir`；  
+     - 或指向完整路径：`export VOSK_LIB_PATH=/path/to/libvosk.so`。
+2. **下载语音模型**并放置于 `data/vosk-models/` 目录：
+   - 普通话：`vosk-model-small-cn-0.22`（从 [Vosk 模型](https://alphacephei.com/vosk/models) 下载）
+   - 英语：`vosk-model-small-en-us-0.15`
 
 ### 皮肤系统
 

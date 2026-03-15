@@ -1,6 +1,7 @@
 #include "status_bar_menu.h"
 #include "status_bar.h"
 #include "help_submenu.h"
+#include "more_input_submenu.h"
 #include "theme_manager.h"
 
 #include <QPainter>
@@ -18,9 +19,12 @@ StatusBarMenu::StatusBarMenu(QWidget *parent)
     setAttribute(Qt::WA_TranslucentBackground);
     setMouseTracking(true);
     hoverSubmenuTimer_.setSingleShot(true);
-    connect(&hoverSubmenuTimer_, &QTimer::timeout, this, &StatusBarMenu::showHelpSubmenu);
+    connect(&hoverSubmenuTimer_, &QTimer::timeout, this, [this]() {
+        if (hoveredItem_ == kHelpItemIndex) showHelpSubmenu();
+        else if (hoveredItem_ == kMoreInputItemIndex) showMoreInputSubmenu();
+    });
     submenuCloseTimer_.setSingleShot(true);
-    connect(&submenuCloseTimer_, &QTimer::timeout, this, &StatusBarMenu::closeHelpSubmenuIfNeeded);
+    connect(&submenuCloseTimer_, &QTimer::timeout, this, &StatusBarMenu::closeSubmenusIfNeeded);
     connect(&checkCursorTimer_, &QTimer::timeout, this, &StatusBarMenu::checkCursorOverMainMenu);
     buildLayout();
 }
@@ -58,14 +62,11 @@ void StatusBarMenu::buildLayout() {
     };
 
     QVector<Def> defs = {
-        {QStringLiteral("\U0001F399"), QStringLiteral("\u8bed\u97f3\u8f93\u5165"),   false, false},
         {QStringLiteral("\u7b26"),     QStringLiteral("\u7b26\u53f7\u5927\u5168"),   false, false},
         {QStringLiteral("\u2328"),     QStringLiteral("\u8f6f\u952e\u76d8"),         false, false},
         {QStringLiteral("\U0001F60A"), QStringLiteral("\u56fe\u7247\u8868\u60c5"),   false, false},
         {QStringLiteral("\u229E"),     QStringLiteral("\u66f4\u591a\u8f93\u5165"),   true,  true},
-        {QStringLiteral("\U0001F3A8"), QStringLiteral("\u76ae\u80a4\u5546\u57ce"),   false, true},
         {QStringLiteral("Ai"),         QStringLiteral("AI\u5de5\u5177"),            true,  true},
-        {QStringLiteral("\u2295"),     QStringLiteral("\u5b9a\u5236\u72b6\u6001\u680f"), false, false},
         {QStringLiteral("\u2753"),     QStringLiteral("\u5e2e\u52a9"),               true,  false},
         {QStringLiteral("\u2699"),     QStringLiteral("\u5168\u5c40\u8bbe\u7f6e"),   false, false},
     };
@@ -270,20 +271,23 @@ void StatusBarMenu::enterEvent(QEnterEvent *event) {
     QPoint pos = event->position().toPoint();
     int nt = toggleHitTest(pos);
     int ni = itemHitTest(pos);
-    if (helpSubmenu_ && helpSubmenu_->isVisible() && (nt >= 0 || (ni >= 0 && ni != 8))) {
-        helpSubmenu_->close();
-        helpSubmenu_ = nullptr;
+    if ((helpSubmenu_ && helpSubmenu_->isVisible()) || (moreInputSubmenu_ && moreInputSubmenu_->isVisible())) {
+        if (nt >= 0 || (ni >= 0 && ni != kHelpItemIndex && ni != kMoreInputItemIndex)) {
+            if (helpSubmenu_) { helpSubmenu_->close(); helpSubmenu_ = nullptr; }
+            if (moreInputSubmenu_) { moreInputSubmenu_->close(); moreInputSubmenu_ = nullptr; }
+        }
     }
     if (nt >= 0 || ni >= 0) {
         hoveredToggle_ = nt;
         hoveredItem_ = ni;
-        if (ni == 8) {
+        if (ni == kMoreInputItemIndex || ni == kHelpItemIndex) {
             hoverSubmenuTimer_.start(100);
         } else {
             hoverSubmenuTimer_.stop();
-            if (helpSubmenu_ && helpSubmenu_->isVisible()) {
-                helpSubmenu_->close();
-                helpSubmenu_ = nullptr;
+            if ((helpSubmenu_ && helpSubmenu_->isVisible()) ||
+                (moreInputSubmenu_ && moreInputSubmenu_->isVisible())) {
+                if (helpSubmenu_) { helpSubmenu_->close(); helpSubmenu_ = nullptr; }
+                if (moreInputSubmenu_) { moreInputSubmenu_->close(); moreInputSubmenu_ = nullptr; }
             }
         }
         setCursor(Qt::PointingHandCursor);
@@ -300,14 +304,15 @@ void StatusBarMenu::mouseMoveEvent(QMouseEvent *event) {
         hoveredToggle_ = nt;
         hoveredItem_ = ni;
 
-        // 滑到「帮助」弹出二级菜单（关于灵键），滑到其他选项关闭二级菜单
-        if (ni == 8) {
+        // 滑到「更多输入」或「帮助」弹出二级菜单，滑到其他选项关闭二级菜单
+        if (ni == kMoreInputItemIndex || ni == kHelpItemIndex) {
             hoverSubmenuTimer_.start(100);
         } else {
             hoverSubmenuTimer_.stop();
-            if (helpSubmenu_ && helpSubmenu_->isVisible()) {
-                helpSubmenu_->close();
-                helpSubmenu_ = nullptr;
+            if ((helpSubmenu_ && helpSubmenu_->isVisible()) ||
+                (moreInputSubmenu_ && moreInputSubmenu_->isVisible())) {
+                if (helpSubmenu_) { helpSubmenu_->close(); helpSubmenu_ = nullptr; }
+                if (moreInputSubmenu_) { moreInputSubmenu_->close(); moreInputSubmenu_ = nullptr; }
             }
         }
 
@@ -341,24 +346,24 @@ void StatusBarMenu::mousePressEvent(QMouseEvent *event) {
 
     int mi = itemHitTest(event->pos());
     if (mi >= 0) {
-        if (mi == 8) {
-            // 帮助：二级菜单已通过悬停显示，点击时若子菜单已打开则不做处理（点击会传递到子菜单）
-            // 若用户快速点击未悬停，则立即显示子菜单
+        if (mi == kHelpItemIndex) {
             if (!helpSubmenu_ || !helpSubmenu_->isVisible()) {
                 showHelpSubmenu();
             }
             return;
         }
+        if (mi == kMoreInputItemIndex) {
+            if (!moreInputSubmenu_ || !moreInputSubmenu_->isVisible()) {
+                showMoreInputSubmenu();
+            }
+            return;
+        }
         switch (mi) {
-        case 0: emit voiceInputClicked(); break;
-        case 1: emit symbolsClicked(); break;
-        case 2: emit softKeyboardClicked(); break;
-        case 3: emit emojiClicked(); break;
-        case 4: emit moreInputClicked(); break;
-        case 5: emit skinStoreClicked(); break;
-        case 6: emit aiToolsClicked(); break;
-        case 7: emit customizeStatusBarClicked(); break;
-        case 9: emit globalSettingsClicked(); break;
+        case 0: emit symbolsClicked(); break;
+        case 1: emit softKeyboardClicked(); break;
+        case 2: emit emojiClicked(); break;
+        case 4: emit aiToolsClicked(); break;
+        case 6: emit globalSettingsClicked(); break;
         default: break;
         }
         close();
@@ -371,6 +376,10 @@ void StatusBarMenu::mousePressEvent(QMouseEvent *event) {
 void StatusBarMenu::showHelpSubmenu() {
     if (helpSubmenu_ && helpSubmenu_->isVisible())
         return;
+    if (moreInputSubmenu_ && moreInputSubmenu_->isVisible()) {
+        moreInputSubmenu_->close();
+        moreInputSubmenu_ = nullptr;
+    }
     if (helpSubmenu_) {
         helpSubmenu_->close();
         helpSubmenu_ = nullptr;
@@ -384,27 +393,73 @@ void StatusBarMenu::showHelpSubmenu() {
         helpSubmenu_ = nullptr;
         checkCursorTimer_.stop();
     });
-    QRectF helpRect = items_[8].rect;
+    QRectF helpRect = items_[kHelpItemIndex].rect;
     QPoint submenuPos = mapToGlobal(QPoint(static_cast<int>(helpRect.right() - 4),
                                            static_cast<int>(helpRect.top())));
     helpSubmenu_->popup(submenuPos);
     checkCursorTimer_.start(50);
 }
 
-void StatusBarMenu::closeHelpSubmenuIfNeeded() {
-    if (!helpSubmenu_ || !helpSubmenu_->isVisible())
+void StatusBarMenu::showMoreInputSubmenu() {
+    if (moreInputSubmenu_ && moreInputSubmenu_->isVisible())
         return;
+    if (helpSubmenu_ && helpSubmenu_->isVisible()) {
+        helpSubmenu_->close();
+        helpSubmenu_ = nullptr;
+    }
+    if (moreInputSubmenu_) {
+        moreInputSubmenu_->close();
+        moreInputSubmenu_ = nullptr;
+    }
+    moreInputSubmenu_ = new MoreInputSubmenu(this);
+    connect(moreInputSubmenu_, &MoreInputSubmenu::voiceInputClicked, this, [this]() {
+        emit voiceInputClicked();
+        close();
+    });
+    connect(moreInputSubmenu_, &MoreInputSubmenu::handwritingInputClicked, this, [this]() {
+        emit handwritingInputClicked();
+        close();
+    });
+    connect(moreInputSubmenu_, &MoreInputSubmenu::skinStoreClicked, this, [this]() {
+        emit skinStoreClicked();
+        close();
+    });
+    connect(moreInputSubmenu_, &MoreInputSubmenu::customizeStatusBarClicked, this, [this]() {
+        emit customizeStatusBarClicked();
+        close();
+    });
+    connect(moreInputSubmenu_, &QWidget::destroyed, this, [this]() {
+        moreInputSubmenu_ = nullptr;
+        checkCursorTimer_.stop();
+    });
+    QRectF moreRect = items_[kMoreInputItemIndex].rect;
+    QPoint submenuPos = mapToGlobal(QPoint(static_cast<int>(moreRect.right() - 4),
+                                           static_cast<int>(moreRect.top())));
+    moreInputSubmenu_->popup(submenuPos);
+    checkCursorTimer_.start(50);
+}
+
+void StatusBarMenu::closeSubmenusIfNeeded() {
     QPoint gp = QCursor::pos();
-    QRect subGeom = helpSubmenu_->geometry();
-    if (subGeom.contains(gp))
-        return;
-    checkCursorTimer_.stop();
-    helpSubmenu_->close();
-    helpSubmenu_ = nullptr;
+    if (helpSubmenu_ && helpSubmenu_->isVisible()) {
+        if (!helpSubmenu_->geometry().contains(gp)) {
+            checkCursorTimer_.stop();
+            helpSubmenu_->close();
+            helpSubmenu_ = nullptr;
+        }
+    }
+    if (moreInputSubmenu_ && moreInputSubmenu_->isVisible()) {
+        if (!moreInputSubmenu_->geometry().contains(gp)) {
+            checkCursorTimer_.stop();
+            moreInputSubmenu_->close();
+            moreInputSubmenu_ = nullptr;
+        }
+    }
 }
 
 void StatusBarMenu::checkCursorOverMainMenu() {
-    if (!helpSubmenu_ || !helpSubmenu_->isVisible())
+    if ((!helpSubmenu_ || !helpSubmenu_->isVisible()) &&
+        (!moreInputSubmenu_ || !moreInputSubmenu_->isVisible()))
         return;
     QPoint gp = QCursor::pos();
     QPoint localPos = mapFromGlobal(gp);
@@ -412,10 +467,10 @@ void StatusBarMenu::checkCursorOverMainMenu() {
         return;
     int nt = toggleHitTest(localPos);
     int ni = itemHitTest(localPos);
-    if (nt >= 0 || (ni >= 0 && ni != 8)) {
+    if (nt >= 0 || (ni >= 0 && ni != kHelpItemIndex && ni != kMoreInputItemIndex)) {
         checkCursorTimer_.stop();
-        helpSubmenu_->close();
-        helpSubmenu_ = nullptr;
+        if (helpSubmenu_) { helpSubmenu_->close(); helpSubmenu_ = nullptr; }
+        if (moreInputSubmenu_) { moreInputSubmenu_->close(); moreInputSubmenu_ = nullptr; }
     }
 }
 

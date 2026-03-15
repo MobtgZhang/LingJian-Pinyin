@@ -26,6 +26,13 @@ readonly BUILD_DIR="${SCRIPT_DIR}/build-release"
 readonly DEB_ROOT="${SCRIPT_DIR}/deb-package"
 readonly DEB_FILE="${SCRIPT_DIR}/${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}.deb"
 
+# Vosk 语音模型（与 https://github.com/alphacep/vosk-api 一致）
+readonly MODELS_DIR="${SCRIPT_DIR}/data/vosk-models"
+readonly CN_MODEL_DIR="vosk-model-small-cn-0.22"
+readonly EN_MODEL_DIR="vosk-model-small-en-us-0.15"
+readonly CN_MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip"
+readonly EN_MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+
 readonly INSTALL_PREFIX="/usr"
 readonly LIB_DIR="${INSTALL_PREFIX}/lib/${PKG_NAME}"
 readonly DATA_DIR="${LIB_DIR}/data"
@@ -75,6 +82,38 @@ check_ubuntu_version() {
     if (( major < 22 )); then
         log_warn "Ubuntu ${ver} 版本低于 22.04，Qt6 / Fcitx5 可能不可用"
     fi
+}
+
+ensure_vosk_models() {
+    log_info "检查 Vosk 语音模型..."
+
+    download_one() {
+        local name="$1"
+        local dir="$2"
+        local url="$3"
+        local target="${MODELS_DIR}/${dir}"
+        if [[ -d "$target" ]]; then
+            log_info "模型已存在，跳过: $name ($dir)"
+            return 0
+        fi
+        log_info "未找到模型 $name，下载: $url"
+        mkdir -p "$MODELS_DIR"
+        local zipfile="${MODELS_DIR}/${dir}.zip"
+        if command -v curl &>/dev/null; then
+            curl -fSL -o "$zipfile" "$url"
+        elif command -v wget &>/dev/null; then
+            wget -q --show-progress -O "$zipfile" "$url"
+        else
+            log_error "需要 curl 或 wget 以下载模型"
+            exit 1
+        fi
+        unzip -o -q "$zipfile" -d "$MODELS_DIR"
+        rm -f "$zipfile"
+        log_info "模型就绪: $target"
+    }
+
+    download_one "中文" "$CN_MODEL_DIR" "$CN_MODEL_URL"
+    download_one "英文" "$EN_MODEL_DIR" "$EN_MODEL_URL"
 }
 
 install_build_deps() {
@@ -145,6 +184,7 @@ prepare_deb_tree() {
     mkdir -p "${DEB_ROOT}${BIN_DIR}"
     mkdir -p "${DEB_ROOT}${LIB_DIR}"
     mkdir -p "${DEB_ROOT}${DATA_DIR}/skins"
+    mkdir -p "${DEB_ROOT}${DATA_DIR}/vosk-models"
     mkdir -p "${DEB_ROOT}${DESKTOP_DIR}"
     mkdir -p "${DEB_ROOT}${ICON_DIR}"
     mkdir -p "${DEB_ROOT}${DOC_DIR}"
@@ -295,6 +335,11 @@ WRAPPER
 
     if [[ -d "${SCRIPT_DIR}/data/skins" ]]; then
         cp -r "${SCRIPT_DIR}/data/skins/"* "${DEB_ROOT}${DATA_DIR}/skins/"
+    fi
+
+    if [[ -d "${MODELS_DIR}" ]]; then
+        log_info "安装 Vosk 语音模型到打包目录..."
+        cp -r "${MODELS_DIR}/"* "${DEB_ROOT}${DATA_DIR}/vosk-models/" 2>/dev/null || true
     fi
 
     if [[ -f "${SCRIPT_DIR}/README.md" ]]; then
@@ -455,6 +500,7 @@ main() {
 
     check_ubuntu_version
     install_build_deps
+    ensure_vosk_models
     build_project
     prepare_deb_tree
     write_control_file

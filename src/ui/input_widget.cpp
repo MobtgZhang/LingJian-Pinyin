@@ -59,6 +59,11 @@ void InputWidget::setChineseMode(bool on) {
 
 void InputWidget::keyPressEvent(QKeyEvent *event) {
     if (!ctx_ || !chineseMode_) {
+        if (!event->text().isEmpty()) {
+            insertTextWithConversion(event->text());
+            event->accept();
+            return;
+        }
         QTextEdit::keyPressEvent(event);
         return;
     }
@@ -172,20 +177,33 @@ void InputWidget::keyPressEvent(QKeyEvent *event) {
     }
 
     if (!ctx_->isComposing()) {
+        if (!event->text().isEmpty()) {
+            insertTextWithConversion(event->text());
+            event->accept();
+            return;
+        }
         QTextEdit::keyPressEvent(event);
     }
 }
 
-void InputWidget::commitText(const QString &text) {
-    if (text.isEmpty()) return;
+QString InputWidget::applyPunctuationWidth(const QString &text) const {
+    if (text.isEmpty()) return text;
     QString result = text;
-    if (traditionalMode_ && chineseMode_) {
-        lingjian::ScTcConverter conv;
-        if (conv.isAvailable()) {
-            result = QString::fromStdString(conv.toTraditional(text.toStdString()));
-        }
-    }
-    if (!fullWidthMode_) {
+    if (fullWidthMode_) {
+        // 半角 -> 全角
+        result = result.replace(QChar(0x0020), QChar(0x3000))
+            .replace(QChar(0x0021), QChar(0xFF01))
+            .replace(QChar(0x002C), QChar(0xFF0C))
+            .replace(QChar(0x002E), QChar(0xFF0E))
+            .replace(QChar(0x003A), QChar(0xFF1A))
+            .replace(QChar(0x003B), QChar(0xFF1B))
+            .replace(QChar(0x003F), QChar(0xFF1F))
+            .replace(QChar(0x0028), QChar(0xFF08))
+            .replace(QChar(0x0029), QChar(0xFF09));
+        for (ushort i = 0; i <= 9; ++i)
+            result = result.replace(QChar(0x0030 + i), QChar(0xFF10 + i));
+    } else {
+        // 全角 -> 半角
         result = result.replace(QChar(0xFF01), QChar(0x0021))
             .replace(QChar(0xFF0C), QChar(0x002C))
             .replace(QChar(0xFF1A), QChar(0x003A))
@@ -200,6 +218,25 @@ void InputWidget::commitText(const QString &text) {
         for (ushort i = 0; i <= 9; ++i)
             result = result.replace(QChar(0xFF10 + i), QChar(0x0030 + i));
     }
+    return result;
+}
+
+void InputWidget::insertTextWithConversion(const QString &text) {
+    if (text.isEmpty()) return;
+    QString result = applyPunctuationWidth(text);
+    QTextEdit::insertPlainText(result);
+}
+
+void InputWidget::commitText(const QString &text) {
+    if (text.isEmpty()) return;
+    QString result = text;
+    if (traditionalMode_ && chineseMode_) {
+        lingjian::ScTcConverter conv;
+        if (conv.isAvailable()) {
+            result = QString::fromStdString(conv.toTraditional(text.toStdString()));
+        }
+    }
+    result = applyPunctuationWidth(result);
     textCursor().insertText(result);
 }
 

@@ -50,7 +50,9 @@ signals:
     void simplifiedTraditionalToggled(SimplifiedTraditional mode);
     void halfFullWidthToggled(HalfFullWidth mode);
     void voiceInputClicked();
+    void handwritingInputClicked();
     void keyboardClicked();
+    void customizeStatusBarClicked();
     void skinClicked();
     void aiClicked();
     void hideRequested();

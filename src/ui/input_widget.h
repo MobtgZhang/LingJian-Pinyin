@@ -29,6 +29,9 @@ public:
     /** 插入已确认的文本（会应用简繁、全半角转换） */
     void insertCommittedText(const QString &text);
 
+    /** 插入普通文本（会应用全半角标点转换，供软键盘等调用） */
+    void insertTextWithConversion(const QString &text);
+
 signals:
     void chineseModeChanged(bool on);
 
@@ -37,6 +40,7 @@ protected:
 
 private:
     void commitText(const QString &text);
+    QString applyPunctuationWidth(const QString &text) const;
     void updateCandidateView();
     void positionCandidateView();
     void scheduleDecode();
