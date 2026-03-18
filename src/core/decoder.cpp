@@ -5,7 +5,6 @@
 #include "pinyin_segmenter.h"
 #include "sentence_decoder.h"
 
-#include <algorithm>
 #include <unordered_set>
 
 namespace core {
@@ -27,20 +26,11 @@ std::vector<CoreCandidate> Decoder::decode(const std::string &pinyin) const {
     if (pinyin.empty() || !dict_ || !dict_->isLoaded()) {
         return {};
     }
-    auto it = decodeCache_.find(pinyin);
-    if (it != decodeCache_.end()) {
-        decodeCacheOrder_.remove(pinyin);
-        decodeCacheOrder_.push_back(pinyin);
-        return it->second;
+    if (auto cached = decodeCache_.get(pinyin)) {
+        return *cached;
     }
     auto result = decodeImpl(pinyin);
-    if (decodeCache_.size() >= kDecodeCacheMaxSize && !decodeCacheOrder_.empty()) {
-        auto oldest = decodeCacheOrder_.front();
-        decodeCacheOrder_.pop_front();
-        decodeCache_.erase(oldest);
-    }
-    decodeCacheOrder_.push_back(pinyin);
-    decodeCache_[pinyin] = result;
+    decodeCache_.put(pinyin, result);
     return result;
 }
 
@@ -112,11 +102,8 @@ std::vector<CoreCandidate> Decoder::decodeImpl(const std::string &pinyin) const 
 
 std::string Decoder::segmentedPinyin(const std::string &pinyin) const {
     if (pinyin.empty()) return {};
-    auto it = segmentCache_.find(pinyin);
-    if (it != segmentCache_.end()) {
-        segmentCacheOrder_.remove(pinyin);
-        segmentCacheOrder_.push_back(pinyin);
-        return it->second;
+    if (auto cached = segmentCache_.get(pinyin)) {
+        return *cached;
     }
     auto seg = segmenter_->bestSegment(pinyin);
     std::string result;
@@ -128,13 +115,7 @@ std::string Decoder::segmentedPinyin(const std::string &pinyin) const {
         if (!result.empty()) result += "'";
         result += seg.remainder;
     }
-    if (segmentCache_.size() >= kSegmentCacheMaxSize && !segmentCacheOrder_.empty()) {
-        auto oldest = segmentCacheOrder_.front();
-        segmentCacheOrder_.pop_front();
-        segmentCache_.erase(oldest);
-    }
-    segmentCacheOrder_.push_back(pinyin);
-    segmentCache_[pinyin] = result;
+    segmentCache_.put(pinyin, result);
     return result;
 }
 

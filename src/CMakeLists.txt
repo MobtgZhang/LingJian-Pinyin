@@ -1,5 +1,4 @@
 add_subdirectory(core)
-add_subdirectory(dict)
 add_subdirectory(utils)
 
 if(BUILD_UI)

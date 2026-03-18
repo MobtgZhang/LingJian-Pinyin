@@ -39,10 +39,10 @@ public:
     void handleCursorRight();
     int currentCursorIndex() const { return cursorIndex_; }
 
-    std::string preeditText() const;
+    const std::string &preeditText() const { return composingPinyin_; }
     std::string segmentedPreedit() const;
-    std::vector<CoreCandidate> candidates() const;
-    std::string committedText() const;
+    const std::vector<CoreCandidate> &candidates() const { return allCandidates_; }
+    const std::string &committedText() const { return committedText_; }
 
     bool isComposing() const { return !composingPinyin_.empty(); }
     void clearCommitted() { committedText_.clear(); }

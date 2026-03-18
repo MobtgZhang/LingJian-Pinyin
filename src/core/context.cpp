@@ -57,7 +57,6 @@ InputContext::KeyResult InputContext::handleBackspace() {
     cursorIndex_ = 0;
     if (composingPinyin_.empty()) {
         allCandidates_.clear();
-        return KeyResult::Committed;
     }
     return KeyResult::Consumed;
 }
@@ -120,21 +119,9 @@ InputContext::KeyResult InputContext::handlePageUp() {
     return KeyResult::Ignored;
 }
 
-std::string InputContext::preeditText() const {
-    return composingPinyin_;
-}
-
 std::string InputContext::segmentedPreedit() const {
     if (composingPinyin_.empty()) return {};
     return decoder_->segmentedPinyin(composingPinyin_);
-}
-
-std::vector<CoreCandidate> InputContext::candidates() const {
-    return allCandidates_;
-}
-
-std::string InputContext::committedText() const {
-    return committedText_;
 }
 
 int InputContext::totalPages() const {
@@ -143,14 +130,9 @@ int InputContext::totalPages() const {
 }
 
 std::vector<CoreCandidate> InputContext::currentPageCandidates() const {
-    std::vector<CoreCandidate> page;
-    int start = currentPage_ * pageSize_;
-    int end = std::min(start + pageSize_,
-                       static_cast<int>(allCandidates_.size()));
-    for (int i = start; i < end; ++i) {
-        page.push_back(allCandidates_[i]);
-    }
-    return page;
+    auto start = std::min<std::size_t>(currentPage_ * pageSize_, allCandidates_.size());
+    auto end = std::min<std::size_t>(start + pageSize_, allCandidates_.size());
+    return {allCandidates_.begin() + start, allCandidates_.begin() + end};
 }
 
 void InputContext::updateCandidates() {

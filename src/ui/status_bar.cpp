@@ -78,7 +78,7 @@ void StatusBar::rebuildButtons() {
 
     int x = kPadding;
     for (int i = 0; i < buttons_.size(); ++i) {
-        if (i == 1) x += kSeparatorWidth + kPadding;
+        if (i == BtnInputMode) x += kSeparatorWidth + kPadding;
         buttons_[i].rect = QRectF(x, (kBarHeight - kButtonSize) / 2.0,
                                    kButtonSize, kButtonSize);
         x += kButtonSize + kPadding;
@@ -122,13 +122,13 @@ void StatusBar::paintEvent(QPaintEvent *event) {
     for (int i = 0; i < buttons_.size(); ++i) {
         const auto &btn = buttons_[i];
 
-        if (btn.hovered && i > 0) {
+        if (btn.hovered && i != BtnLogo) {
             QPainterPath hoverPath;
             hoverPath.addRoundedRect(btn.rect.adjusted(1, 1, -1, -1), 4, 4);
             painter.fillPath(hoverPath, hoverColor_);
         }
 
-        if (i == 1) {
+        if (i == BtnInputMode) {
             double sepX = btn.rect.left() - kPadding / 2.0 - kSeparatorWidth / 2.0;
             painter.setPen(QPen(borderColor_, kSeparatorWidth));
             painter.drawLine(QPointF(sepX, btn.rect.top() + 4),
@@ -139,28 +139,28 @@ void StatusBar::paintEvent(QPaintEvent *event) {
         QColor drawColor = textColor_;
 
         switch (i) {
-        case 0:
+        case BtnLogo:
             drawFont.setPointSize(14);
             drawFont.setWeight(QFont::Bold);
             drawColor = logoColor_;
             break;
-        case 1:
+        case BtnInputMode:
             drawFont.setPointSize(14);
             drawFont.setWeight(QFont::Bold);
             break;
-        case 2:
+        case BtnHalfFull:
             drawFont.setPointSize(16);
             break;
-        case 3:
+        case BtnVoice:
             drawFont.setPointSize(13);
             break;
-        case 4:
+        case BtnKeyboard:
             drawFont.setPointSize(14);
             break;
-        case 5:
+        case BtnSkin:
             drawFont.setPointSize(13);
             break;
-        case 6:
+        case BtnAi:
             drawFont.setPointSize(12);
             drawFont.setWeight(QFont::Bold);
             drawColor = aiColor_;
@@ -247,30 +247,30 @@ void StatusBar::mouseReleaseEvent(QMouseEvent *event) {
 
         int idx = hitTest(event->pos());
         switch (idx) {
-        case 1: {
+        case BtnInputMode: {
             InputMode newMode = (inputMode_ == InputMode::Chinese)
                 ? InputMode::English : InputMode::Chinese;
             setInputMode(newMode);
             emit inputModeToggled(newMode);
             break;
         }
-        case 2: {
+        case BtnHalfFull: {
             HalfFullWidth newMode = (halfFullWidth_ == HalfFullWidth::Full)
                 ? HalfFullWidth::Half : HalfFullWidth::Full;
             setHalfFullWidth(newMode);
             emit halfFullWidthToggled(newMode);
             break;
         }
-        case 3:
+        case BtnVoice:
             emit voiceInputClicked();
             break;
-        case 4:
+        case BtnKeyboard:
             emit keyboardClicked();
             break;
-        case 5:
+        case BtnSkin:
             emit skinClicked();
             break;
-        case 6:
+        case BtnAi:
             emit aiClicked();
             break;
         default:

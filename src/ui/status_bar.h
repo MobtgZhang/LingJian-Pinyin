@@ -66,6 +66,17 @@ protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
 
 private:
+    enum ButtonId {
+        BtnLogo = 0,
+        BtnInputMode,
+        BtnHalfFull,
+        BtnVoice,
+        BtnKeyboard,
+        BtnSkin,
+        BtnAi,
+        BtnCount
+    };
+
     struct ButtonItem {
         QString label;
         QRectF rect;
@@ -78,7 +89,7 @@ private:
     InputMode inputMode_ = InputMode::Chinese;
     PunctuationMode punctuationMode_ = PunctuationMode::Chinese;
     SimplifiedTraditional simplifiedTraditional_ = SimplifiedTraditional::Simplified;
-    HalfFullWidth halfFullWidth_ = HalfFullWidth::Full;
+    HalfFullWidth halfFullWidth_ = HalfFullWidth::Half;
 
     QColor bgColor_{255, 255, 255, 245};
     QColor borderColor_{210, 210, 210};

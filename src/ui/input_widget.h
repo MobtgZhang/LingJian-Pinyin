@@ -51,7 +51,7 @@ private:
     StatusBar *statusBar_ = nullptr;
     bool chineseMode_ = true;
     bool traditionalMode_ = false;
-    bool fullWidthMode_ = true;
+    bool fullWidthMode_ = false;
     QTimer decodeDebounceTimer_;
     static constexpr int kDebounceMs = 35;
 };

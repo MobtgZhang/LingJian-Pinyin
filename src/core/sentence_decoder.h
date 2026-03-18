@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,10 +30,26 @@ public:
                                                    int beamWidth = 8) const;
 
 private:
+    struct WordLink {
+        std::shared_ptr<WordLink> prev;
+        std::string word;
+    };
+
     struct Node {
-        std::vector<std::string> words;
+        std::shared_ptr<WordLink> tail;
         std::size_t pinyinPos;
         float score;
+
+        std::vector<std::string> collectWords() const {
+            std::vector<std::string> result;
+            for (auto p = tail; p; p = p->prev) result.push_back(p->word);
+            std::reverse(result.begin(), result.end());
+            return result;
+        }
+
+        std::string lastWord() const {
+            return tail ? tail->word : std::string{};
+        }
     };
 
     std::shared_ptr<Dictionary> dict_;

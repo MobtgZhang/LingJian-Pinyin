@@ -37,18 +37,16 @@ std::vector<SentencePath> SentenceDecoder::decode(
     using BeamQueue = std::priority_queue<Node, std::vector<Node>, NodeCmp>;
     BeamQueue beam;
 
-    beam.push({{}, 0, 0.0f});
+    beam.push({nullptr, 0, 0.0f});
 
     for (std::size_t step = 0; step < syllables.size(); ++step) {
         BeamQueue nextBeam;
 
-        int processed = 0;
         std::vector<Node> currentNodes;
         currentNodes.reserve(beamWidth);
-        while (!beam.empty() && processed < beamWidth) {
-            currentNodes.push_back(beam.top());
+        for (int i = 0; !beam.empty() && i < beamWidth; ++i) {
+            currentNodes.push_back(std::move(const_cast<Node &>(beam.top())));
             beam.pop();
-            ++processed;
         }
 
         for (const auto &node : currentNodes) {
@@ -61,68 +59,58 @@ std::vector<SentencePath> SentenceDecoder::decode(
             for (std::size_t span = 1;
                  span <= syllables.size() - step && span <= kMaxSpan; ++span) {
                 std::string flatPinyin;
-                for (std::size_t k = 0; k < span; ++k) {
+                for (std::size_t k = 0; k < span; ++k)
                     flatPinyin += syllables[step + k];
-                }
 
                 auto tryEntries = [&](const std::string &py) {
                     auto entries = dict_->lookup(py, kMaxEntriesPerLookup);
                     for (const auto &e : entries) {
                         if (!seenWords.insert(e.text).second) continue;
 
-                        float wordScore = lm_->unigramScore(e.text);
-                        if (!node.words.empty()) {
-                            wordScore = lm_->bigramScore(
-                                node.words.back(), e.text);
-                        }
+                        float wordScore = node.tail
+                            ? lm_->bigramScore(node.lastWord(), e.text)
+                            : lm_->unigramScore(e.text);
 
-                        Node next;
-                        next.words = node.words;
-                        next.words.push_back(e.text);
-                        next.pinyinPos = step + span;
-                        next.score = node.score + wordScore;
-                        nextBeam.push(next);
+                        auto link = std::make_shared<WordLink>(
+                            WordLink{node.tail, e.text});
+                        nextBeam.push({link, step + span,
+                                       node.score + wordScore});
                     }
                 };
 
                 tryEntries(flatPinyin);
                 if (span > 1) {
-                    std::string combinedPinyin;
+                    std::string combined;
                     for (std::size_t k = 0; k < span; ++k) {
-                        if (k > 0) combinedPinyin += "'";
-                        combinedPinyin += syllables[step + k];
+                        if (k > 0) combined += "'";
+                        combined += syllables[step + k];
                     }
-                    if (combinedPinyin != flatPinyin) tryEntries(combinedPinyin);
+                    if (combined != flatPinyin) tryEntries(combined);
                 }
             }
         }
 
         beam = BeamQueue{};
-        int kept = 0;
-        const int maxKept = beamWidth;
-        while (!nextBeam.empty() && kept < maxKept) {
-            beam.push(nextBeam.top());
+        for (int i = 0; !nextBeam.empty() && i < beamWidth; ++i) {
+            beam.push(std::move(const_cast<Node &>(nextBeam.top())));
             nextBeam.pop();
-            ++kept;
         }
     }
 
     std::vector<SentencePath> results;
     std::unordered_set<std::string> seenSentences;
     while (!beam.empty()) {
-        const auto &node = beam.top();
-        if (node.pinyinPos == syllables.size()) {
-            std::string sentence;
-            for (const auto &w : node.words) sentence += w;
-
-            if (seenSentences.insert(sentence).second) {
-                SentencePath path;
-                path.words = node.words;
-                path.score = node.score;
-                results.push_back(path);
-            }
-        }
+        auto node = std::move(const_cast<Node &>(beam.top()));
         beam.pop();
+        if (node.pinyinPos != syllables.size()) continue;
+
+        auto words = node.collectWords();
+        std::string sentence;
+        for (const auto &w : words) sentence += w;
+
+        if (seenSentences.insert(sentence).second) {
+            results.push_back({std::move(words), node.score});
+        }
     }
 
     std::sort(results.begin(), results.end(),
@@ -132,7 +120,6 @@ std::vector<SentencePath> SentenceDecoder::decode(
 
     constexpr std::size_t kMaxResults = 20;
     if (results.size() > kMaxResults) results.resize(kMaxResults);
-
     return results;
 }
 
@@ -151,10 +138,8 @@ std::vector<CoreCandidate> SentenceDecoder::decodeToCandidates(
             if (i > 0) comment += " ";
             comment += path.words[i];
         }
-
         candidates.push_back({text, comment});
     }
-
     return candidates;
 }
 

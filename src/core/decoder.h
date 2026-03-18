@@ -1,10 +1,10 @@
 #pragma once
 
+#include "lru_cache.h"
+
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
-#include <list>
 
 namespace core {
 
@@ -33,12 +33,8 @@ private:
     std::shared_ptr<LanguageModel> lm_;
     std::unique_ptr<SentenceDecoder> sentenceDecoder_;
 
-    mutable std::list<std::string> decodeCacheOrder_;
-    mutable std::unordered_map<std::string, std::vector<CoreCandidate>> decodeCache_;
-    mutable std::list<std::string> segmentCacheOrder_;
-    mutable std::unordered_map<std::string, std::string> segmentCache_;
-    static constexpr std::size_t kDecodeCacheMaxSize = 128;
-    static constexpr std::size_t kSegmentCacheMaxSize = 64;
+    mutable LruCache<std::string, std::vector<CoreCandidate>> decodeCache_{128};
+    mutable LruCache<std::string, std::string> segmentCache_{64};
 };
 
 } // namespace core

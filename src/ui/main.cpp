@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDir>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QSystemTrayIcon>
 #include <QMenu>
@@ -61,7 +62,7 @@ static QString findDictPath() {
     };
     for (const auto &p : searchPaths) {
         if (QFile::exists(p)) {
-            return QDir(p).absolutePath();
+            return QFileInfo(p).absoluteFilePath();
         }
     }
     return {};
@@ -179,28 +180,27 @@ int main(int argc, char *argv[]) {
         candidateView.hide();
     });
 
-    QObject::connect(&candidateView, &CandidateView::pageUpClicked,
-                     inputWidget, [&ctx, &candidateView]() {
-        ctx->handlePageUp();
+    auto refreshCandidateView = [&ctx, &candidateView]() {
         auto pageCandidates = ctx->currentPageCandidates();
         QStringList items;
+        items.reserve(pageCandidates.size());
         for (const auto &c : pageCandidates)
             items << QString::fromStdString(c.text);
         candidateView.setCandidates(items);
         candidateView.setPageInfo(ctx->currentPage() + 1, ctx->totalPages());
         candidateView.setHighlightedIndex(ctx->currentCursorIndex());
+    };
+
+    QObject::connect(&candidateView, &CandidateView::pageUpClicked,
+                     inputWidget, [&ctx, refreshCandidateView]() {
+        ctx->handlePageUp();
+        refreshCandidateView();
     });
 
     QObject::connect(&candidateView, &CandidateView::pageDownClicked,
-                     inputWidget, [&ctx, &candidateView]() {
+                     inputWidget, [&ctx, refreshCandidateView]() {
         ctx->handlePageDown();
-        auto pageCandidates = ctx->currentPageCandidates();
-        QStringList items;
-        for (const auto &c : pageCandidates)
-            items << QString::fromStdString(c.text);
-        candidateView.setCandidates(items);
-        candidateView.setPageInfo(ctx->currentPage() + 1, ctx->totalPages());
-        candidateView.setHighlightedIndex(ctx->currentCursorIndex());
+        refreshCandidateView();
     });
 
     auto *softKeyboard = new SoftKeyboard;
@@ -222,34 +222,16 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(softKeyboard, &SoftKeyboard::specialKeyPressed,
                      inputWidget, [inputWidget](Qt::Key key) {
-        switch (key) {
-        case Qt::Key_Backspace: {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier);
-            QApplication::sendEvent(inputWidget, &ev);
-            break;
-        }
-        case Qt::Key_Return: {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
-            QApplication::sendEvent(inputWidget, &ev);
-            break;
-        }
-        case Qt::Key_Tab: {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
-            QApplication::sendEvent(inputWidget, &ev);
-            break;
-        }
-        case Qt::Key_Delete: {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
-            QApplication::sendEvent(inputWidget, &ev);
-            break;
-        }
-        case Qt::Key_Insert: {
-            QKeyEvent ev(QEvent::KeyPress, Qt::Key_Insert, Qt::NoModifier);
-            QApplication::sendEvent(inputWidget, &ev);
-            break;
-        }
-        default:
-            break;
+        static const Qt::Key forwarded[] = {
+            Qt::Key_Backspace, Qt::Key_Return, Qt::Key_Tab,
+            Qt::Key_Delete, Qt::Key_Insert
+        };
+        for (auto k : forwarded) {
+            if (key == k) {
+                QKeyEvent ev(QEvent::KeyPress, k, Qt::NoModifier);
+                QApplication::sendEvent(inputWidget, &ev);
+                return;
+            }
         }
     });
 

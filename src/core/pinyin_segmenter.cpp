@@ -14,10 +14,10 @@ const std::vector<std::string> &PinyinSegmenter::validSyllables() {
         "pa","po","pi","pu","pai","pei","pao","pou","pan","pen","pang","peng","pian","piao","pie","pin","ping",
         "ma","mo","me","mi","mu","mai","mei","mao","mou","man","men","mang","meng","mian","miao","mie","min","ming","miu",
         "fa","fo","fu","fei","fou","fan","fen","fang","feng",
-        "da","de","di","du","dai","dei","dao","dou","dan","den","dang","deng","dong","dian","diao","die","diu","ding","duan","dui","dun",
-        "ta","te","ti","tu","tai","tei","tao","tou","tan","tang","teng","tong","tian","tiao","tie","ting","tuan","tui","tun",
-        "na","ne","ni","nu","nv","nai","nei","nao","nou","nan","nen","nang","neng","nong","nian","niang","niao","nie","nin","ning","niu","nuan","nve",
-        "la","le","li","lu","lv","lai","lei","lao","lou","lan","lang","leng","long","lian","liang","liao","lie","lin","ling","liu","luan","lve","lun",
+        "da","de","di","du","dai","dei","dao","dou","dan","den","dang","deng","dong","dian","diao","die","diu","ding","duan","dui","dun","duo",
+        "ta","te","ti","tu","tai","tei","tao","tou","tan","tang","teng","tong","tian","tiao","tie","ting","tuan","tui","tun","tuo",
+        "na","ne","ni","nu","nv","nai","nei","nao","nou","nan","nen","nang","neng","nong","nian","niang","niao","nie","nin","ning","niu","nuan","nve","nuo",
+        "la","le","li","lu","lv","lai","lei","lao","lou","lan","lang","leng","long","lian","liang","liao","lie","lin","ling","liu","luan","lve","lun","luo",
         "ga","ge","gu","gai","gei","gao","gou","gan","gen","gang","geng","gong","gua","guai","guan","guang","gui","gun","guo",
         "ka","ke","ku","kai","kei","kao","kou","kan","ken","kang","keng","kong","kua","kuai","kuan","kuang","kui","kun","kuo",
         "ha","he","hu","hai","hei","hao","hou","han","hen","hang","heng","hong","hua","huai","huan","huang","hui","hun","huo",
@@ -33,17 +33,14 @@ const std::vector<std::string> &PinyinSegmenter::validSyllables() {
         "si","sa","se","su","sai","sao","sou","san","sen","sang","seng","song","suan","sui","sun","suo",
         "ya","yo","ye","yi","yu","yai","yao","you","yan","yin","yang","ying","yong","yuan","yue","yun",
         "wa","wo","wu","wai","wei","wan","wen","wang","weng",
+        "ng",
     };
     return table;
 }
 
 bool PinyinSegmenter::isValidSyllable(const std::string &s) {
-    static std::unordered_set<std::string> set;
-    if (set.empty()) {
-        for (const auto &sy : validSyllables()) {
-            set.insert(sy);
-        }
-    }
+    static const std::unordered_set<std::string> set(
+        validSyllables().begin(), validSyllables().end());
     return set.count(s) > 0;
 }
 

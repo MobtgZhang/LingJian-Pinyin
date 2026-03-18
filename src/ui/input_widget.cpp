@@ -190,33 +190,37 @@ QString InputWidget::applyPunctuationWidth(const QString &text) const {
     if (text.isEmpty()) return text;
     QString result = text;
     if (fullWidthMode_) {
-        // 半角 -> 全角
-        result = result.replace(QChar(0x0020), QChar(0x3000))
-            .replace(QChar(0x0021), QChar(0xFF01))
-            .replace(QChar(0x002C), QChar(0xFF0C))
-            .replace(QChar(0x002E), QChar(0xFF0E))
-            .replace(QChar(0x003A), QChar(0xFF1A))
-            .replace(QChar(0x003B), QChar(0xFF1B))
-            .replace(QChar(0x003F), QChar(0xFF1F))
-            .replace(QChar(0x0028), QChar(0xFF08))
-            .replace(QChar(0x0029), QChar(0xFF09));
-        for (ushort i = 0; i <= 9; ++i)
-            result = result.replace(QChar(0x0030 + i), QChar(0xFF10 + i));
+        QString out;
+        out.reserve(result.size());
+        for (QChar ch : result) {
+            ushort c = ch.unicode();
+            if (c >= 0x0021 && c <= 0x007E) {
+                out += QChar(0xFF01 + (c - 0x0021));
+            } else if (c == 0x0020) {
+                out += QChar(0x3000);
+            } else {
+                out += ch;
+            }
+        }
+        result = out;
     } else {
-        // 全角 -> 半角
-        result = result.replace(QChar(0xFF01), QChar(0x0021))
-            .replace(QChar(0xFF0C), QChar(0x002C))
-            .replace(QChar(0xFF1A), QChar(0x003A))
-            .replace(QChar(0xFF1B), QChar(0x003B))
-            .replace(QChar(0xFF1F), QChar(0x003F))
-            .replace(QChar(0xFF08), QChar(0x0028))
-            .replace(QChar(0xFF09), QChar(0x0029))
-            .replace(QChar(0x3001), QChar(0x002C))
-            .replace(QChar(0x3002), QChar(0x002E))
-            .replace(QChar(0xFF0E), QChar(0x002E))
-            .replace(QChar(0x3000), QChar(0x0020));
-        for (ushort i = 0; i <= 9; ++i)
-            result = result.replace(QChar(0xFF10 + i), QChar(0x0030 + i));
+        QString out;
+        out.reserve(result.size());
+        for (QChar ch : result) {
+            ushort c = ch.unicode();
+            if (c >= 0xFF01 && c <= 0xFF5E) {
+                out += QChar(0x0021 + (c - 0xFF01));
+            } else if (c == 0x3000) {
+                out += QChar(0x0020);
+            } else if (c == 0x3001) {
+                out += QChar(',');
+            } else if (c == 0x3002) {
+                out += QChar('.');
+            } else {
+                out += ch;
+            }
+        }
+        result = out;
     }
     return result;
 }

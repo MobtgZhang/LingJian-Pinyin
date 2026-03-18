@@ -1,5 +1,4 @@
 add_library(lingjian_utils STATIC
-    utils_placeholder.cpp
     sc_tc_converter.cpp
 )
 
